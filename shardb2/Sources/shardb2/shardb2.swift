@@ -5,9 +5,11 @@ import HealthKit
 public final class HealthStatsLibrary {
     private let healthKitManager = HealthKitManager()
     private let modelContext: ModelContext
+    private let databaseInitializer: DatabaseInitializer
     
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
+        self.databaseInitializer = DatabaseInitializer(modelContext: modelContext)
     }
     
     public func sampleAndStoreLatestStepCount() async throws -> StepCountRecord {
@@ -87,5 +89,10 @@ public final class HealthStatsLibrary {
         
         try modelContext.save()
         return records
+    }
+    
+    // Database initialization with progress streaming
+    public func initializeDatabase(for user: User) -> AsyncStream<InitializationProgress> {
+        return databaseInitializer.initializeDatabase(for: user)
     }
 }

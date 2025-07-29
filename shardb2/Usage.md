@@ -45,7 +45,12 @@ print("Steps today: \(record.stepCount)")
 let weeklyRecords = try await healthStats.fetchAndStoreLast7DaysStepCount()
 print("Fetched \(weeklyRecords.count) days of data")
 
-// 8. Retrieve stored data
+// 8. Initialize database with detailed progress tracking
+for await progress in healthStats.initializeDatabase(for: user) {
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+
+// 9. Retrieve stored data
 let allRecords = try healthStats.getAllStepCountRecords()
 let allUsers = try healthStats.getAllUsers()
 ```
@@ -74,6 +79,7 @@ try healthStats.deleteUser(user)
 - `sampleAndStoreLatestStepCount() async throws -> StepCountRecord` - Fetches today's step count and stores it
 - `fetchAndStoreLast7DaysStepCount() async throws -> [StepCountRecord]` - Fetches and stores last 7 days of step data
 - `getHealthKitAuthorizationStatus(for: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus` - Checks HealthKit permission status
+- `initializeDatabase(for: User) -> AsyncStream<InitializationProgress>` - Comprehensive database initialization with detailed progress updates
 
 ### Step Count Data Functions  
 - `getAllStepCountRecords() throws -> [StepCountRecord]` - Returns all stored step count records
@@ -90,7 +96,7 @@ try healthStats.deleteUser(user)
 
 **StepCountRecord**: stepCount (Int), date (Date), recordedAt (Date)
 
-**User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
+**User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
 
 **DailyAnalytics**: Comprehensive daily health metrics with strongly typed properties:
 - id (Int) - Auto-incrementing identifier
@@ -137,3 +143,7 @@ try healthStats.deleteUser(user)
 - endDate (Date) - End of the year (December 31st)
 - All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
+
+**InitializationProgress**: Progress tracking for database initialization:
+- percentage (Double) - Progress percentage (0.0 to 100.0)
+- currentTask (String) - Human-readable description of current operation
