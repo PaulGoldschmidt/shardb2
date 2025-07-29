@@ -3,6 +3,7 @@ import SwiftData
 
 @Model
 public final class YearlyAnalytics {
+    public var id: Int
     @Attribute(.unique) public var year: Int
     public var startDate: Date
     public var endDate: Date
@@ -36,6 +37,7 @@ public final class YearlyAnalytics {
     public var recordedAt: Date
     
     public init(
+        id: Int,
         year: Int,
         startDate: Date,
         endDate: Date,
@@ -58,6 +60,7 @@ public final class YearlyAnalytics {
         sleepREM: Int = 0,
         recordedAt: Date = Date()
     ) {
+        self.id = id
         self.year = year
         self.startDate = startDate
         self.endDate = endDate

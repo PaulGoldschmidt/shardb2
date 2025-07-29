@@ -3,6 +3,7 @@ import SwiftData
 
 @Model
 public final class DailyAnalytics {
+    public var id: Int
     @Attribute(.unique) public var date: Date
     
     // Activity metrics
@@ -34,6 +35,7 @@ public final class DailyAnalytics {
     public var recordedAt: Date
     
     public init(
+        id: Int,
         date: Date,
         steps: Int = 0,
         cyclingDistance: Double = 0.0,
@@ -54,6 +56,7 @@ public final class DailyAnalytics {
         sleepREM: Int = 0,
         recordedAt: Date = Date()
     ) {
+        self.id = id
         self.date = date
         self.steps = steps
         self.cyclingDistance = cyclingDistance

@@ -93,6 +93,7 @@ try healthStats.deleteUser(user)
 **User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
 
 **DailyAnalytics**: Comprehensive daily health metrics with strongly typed properties:
+- id (Int) - Auto-incrementing identifier
 - date (Date, unique) - The day these metrics represent
 - steps (Int) - Step count
 - cyclingDistance (Double) - Cycling distance in meters
@@ -114,12 +115,14 @@ try healthStats.deleteUser(user)
 - recordedAt (Date) - When this record was created
 
 **WeeklyAnalytics**: Weekly aggregated health metrics with the same data points as DailyAnalytics:
+- id (Int) - Auto-incrementing identifier
 - startDate (Date) - Start of the week
 - endDate (Date) - End of the week
 - All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
 
 **MonthlyAnalytics**: Monthly aggregated health metrics:
+- id (Int) - Auto-incrementing identifier
 - year (Int) - The year this data represents
 - month (Int) - The month (1-12) this data represents
 - startDate (Date) - Start of the month
@@ -128,6 +131,7 @@ try healthStats.deleteUser(user)
 - recordedAt (Date) - When this record was created
 
 **YearlyAnalytics**: Yearly aggregated health metrics:
+- id (Int) - Auto-incrementing identifier
 - year (Int, unique) - The year this data represents
 - startDate (Date) - Start of the year (January 1st)
 - endDate (Date) - End of the year (December 31st)

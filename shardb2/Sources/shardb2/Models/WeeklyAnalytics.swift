@@ -3,6 +3,7 @@ import SwiftData
 
 @Model
 public final class WeeklyAnalytics {
+    public var id: Int
     public var startDate: Date
     public var endDate: Date
     
@@ -35,6 +36,7 @@ public final class WeeklyAnalytics {
     public var recordedAt: Date
     
     public init(
+        id: Int,
         startDate: Date,
         endDate: Date,
         steps: Int = 0,
@@ -56,6 +58,7 @@ public final class WeeklyAnalytics {
         sleepREM: Int = 0,
         recordedAt: Date = Date()
     ) {
+        self.id = id
         self.startDate = startDate
         self.endDate = endDate
         self.steps = steps
