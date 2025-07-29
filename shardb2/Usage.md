@@ -19,7 +19,7 @@ import HealthKit
 import shardb2
 
 // 1. Setup SwiftData with all models
-let container = try ModelContainer(for: StepCountRecord.self, User.self, DailyAnalytics.self)
+let container = try ModelContainer(for: StepCountRecord.self, User.self, DailyAnalytics.self, WeeklyAnalytics.self, MonthlyAnalytics.self, YearlyAnalytics.self)
 let context = ModelContext(container)
 
 // 2. Initialize library
@@ -111,4 +111,25 @@ try healthStats.deleteUser(user)
 - sleepTotal (Int) - Total sleep time in minutes
 - sleepDeep (Int) - Deep sleep time in minutes
 - sleepREM (Int) - REM sleep time in minutes
+- recordedAt (Date) - When this record was created
+
+**WeeklyAnalytics**: Weekly aggregated health metrics with the same data points as DailyAnalytics:
+- startDate (Date) - Start of the week
+- endDate (Date) - End of the week
+- All the same health metrics as DailyAnalytics
+- recordedAt (Date) - When this record was created
+
+**MonthlyAnalytics**: Monthly aggregated health metrics:
+- year (Int) - The year this data represents
+- month (Int) - The month (1-12) this data represents
+- startDate (Date) - Start of the month
+- endDate (Date) - End of the month
+- All the same health metrics as DailyAnalytics
+- recordedAt (Date) - When this record was created
+
+**YearlyAnalytics**: Yearly aggregated health metrics:
+- year (Int, unique) - The year this data represents
+- startDate (Date) - Start of the year (January 1st)
+- endDate (Date) - End of the year (December 31st)
+- All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
