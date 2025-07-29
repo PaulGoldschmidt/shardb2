@@ -14,31 +14,6 @@ public final class HealthStatsLibrary {
         self.dataUpdater = DataUpdater(modelContext: modelContext)
     }
     
-    public func sampleAndStoreLatestStepCount() async throws -> StepCountRecord {
-        let (stepCount, date) = try await healthKitManager.fetchLatestStepCount()
-        
-        let record = StepCountRecord(stepCount: stepCount, date: date)
-        modelContext.insert(record)
-        
-        try modelContext.save()
-        
-        return record
-    }
-    
-    public func getAllStepCountRecords() throws -> [StepCountRecord] {
-        let descriptor = FetchDescriptor<StepCountRecord>(
-            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
-        )
-        return try modelContext.fetch(descriptor)
-    }
-    
-    public func getLatestStepCountRecord() throws -> StepCountRecord? {
-        var descriptor = FetchDescriptor<StepCountRecord>(
-            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
-    }
     
     // User management methods
     public func createUser(birthdate: Date, usesMetric: Bool = true) throws -> User {
@@ -77,21 +52,6 @@ public final class HealthStatsLibrary {
         return healthKitManager.getAuthorizationStatus(for: type)
     }
     
-    // Fetch and store last 7 days of step count data
-    public func fetchAndStoreLast7DaysStepCount() async throws -> [StepCountRecord] {
-        let dailyStepData = try await healthKitManager.fetchStepCountLast7Days()
-        
-        var records: [StepCountRecord] = []
-        
-        for dayData in dailyStepData {
-            let record = StepCountRecord(stepCount: dayData.stepCount, date: dayData.date)
-            modelContext.insert(record)
-            records.append(record)
-        }
-        
-        try modelContext.save()
-        return records
-    }
     
     // Database initialization with progress streaming
     public func initializeDatabase(for user: User) -> AsyncStream<InitializationProgress> {

@@ -25,7 +25,7 @@ public final class HealthDataAggregator {
         // Fetch data for each quantity type
         for (index, quantityType) in quantityTypes.enumerated() {
             let typeName = getHumanReadableName(for: quantityType.identifier)
-            let progress = 1.0 + (Double(index) / Double(quantityTypes.count)) * 8.0 // 1% to 9%
+            let progress = 1.0 + (Double(index) / Double(quantityTypes.count)) * 7.0 // 1% to 8%
             
             progressCallback(InitializationProgress(
                 percentage: progress,
@@ -34,6 +34,17 @@ public final class HealthDataAggregator {
             
             let samples = try await fetchSamples(for: quantityType, predicate: predicate)
             processSamples(samples, into: &dailyData, calendar: calendar)
+        }
+        
+        // Fetch sleep analysis data separately as it's a category type
+        if let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) {
+            progressCallback(InitializationProgress(
+                percentage: 8.0,
+                currentTask: "Fetching Sleep Analysis data..."
+            ))
+            
+            let sleepSamples = try await fetchSleepSamples(for: sleepType, predicate: predicate)
+            processSleepSamples(sleepSamples, into: &dailyData, calendar: calendar)
         }
         
         return dailyData
@@ -93,10 +104,6 @@ public final class HealthDataAggregator {
                 dataPoint.exerciseMinutes += Int(sample.quantity.doubleValue(for: .minute()))
             case HKQuantityTypeIdentifier.appleStandTime.rawValue:
                 dataPoint.standMinutes += Int(sample.quantity.doubleValue(for: .minute()))
-            case HKQuantityTypeIdentifier.sleepAnalysis.rawValue:
-                let sleepMinutes = Int(sample.quantity.doubleValue(for: .minute()))
-                dataPoint.sleepTotal += sleepMinutes
-                // Note: Deep sleep and REM would need additional processing from sleep analysis data
             default:
                 break
             }
@@ -110,7 +117,7 @@ public final class HealthDataAggregator {
             .stepCount, .distanceCycling, .distanceWalkingRunning, .distanceSwimming,
             .swimmingStrokeCount, .distanceCrossCountrySkiing, .distanceDownhillSnowSports,
             .activeEnergyBurned, .basalEnergyBurned, .heartRate, .flightsClimbed,
-            .appleExerciseTime, .appleStandTime, .sleepAnalysis
+            .appleExerciseTime, .appleStandTime
         ]
         
         return identifiers.compactMap { HKQuantityType.quantityType(forIdentifier: $0) }
@@ -144,10 +151,62 @@ public final class HealthDataAggregator {
             return "Exercise Time"
         case HKQuantityTypeIdentifier.appleStandTime.rawValue:
             return "Stand Time"
-        case HKQuantityTypeIdentifier.sleepAnalysis.rawValue:
-            return "Sleep Analysis"
         default:
             return "Health Data"
+        }
+    }
+    
+    private func fetchSleepSamples(for categoryType: HKCategoryType, predicate: NSPredicate) async throws -> [HKCategorySample] {
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: categoryType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: HealthKitError.queryFailed(error))
+                    return
+                }
+                
+                let categorySamples = samples as? [HKCategorySample] ?? []
+                continuation.resume(returning: categorySamples)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
+    private func processSleepSamples(_ samples: [HKCategorySample], into dailyData: inout [Date: HealthDataPoint], calendar: Calendar) {
+        for sample in samples {
+            let day = calendar.startOfDay(for: sample.startDate)
+            
+            var dataPoint = dailyData[day] ?? HealthDataPoint()
+            
+            // Calculate sleep duration in minutes
+            let sleepDuration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0
+            let sleepMinutes = Int(sleepDuration)
+            
+            // Process different sleep stages
+            switch sample.value {
+            case HKCategoryValueSleepAnalysis.inBed.rawValue,
+                 HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+                dataPoint.sleepTotal += sleepMinutes
+            case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                dataPoint.sleepTotal += sleepMinutes
+                // Core sleep can be considered as regular sleep
+            case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                dataPoint.sleepTotal += sleepMinutes
+                dataPoint.sleepDeep += sleepMinutes
+            case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                dataPoint.sleepTotal += sleepMinutes
+                dataPoint.sleepREM += sleepMinutes
+            default:
+                // Handle other sleep states if needed
+                break
+            }
+            
+            dailyData[day] = dataPoint
         }
     }
 }
