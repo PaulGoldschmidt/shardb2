@@ -67,4 +67,25 @@ public final class HealthStatsLibrary {
         modelContext.delete(user)
         try modelContext.save()
     }
+    
+    // HealthKit authorization status
+    public func getHealthKitAuthorizationStatus(for type: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus {
+        return healthKitManager.getAuthorizationStatus(for: type)
+    }
+    
+    // Fetch and store last 7 days of step count data
+    public func fetchAndStoreLast7DaysStepCount() async throws -> [StepCountRecord] {
+        let dailyStepData = try await healthKitManager.fetchStepCountLast7Days()
+        
+        var records: [StepCountRecord] = []
+        
+        for dayData in dailyStepData {
+            let record = StepCountRecord(stepCount: dayData.stepCount, date: dayData.date)
+            modelContext.insert(record)
+            records.append(record)
+        }
+        
+        try modelContext.save()
+        return records
+    }
 }
