@@ -6,10 +6,12 @@ public final class HealthStatsLibrary {
     private let healthKitManager = HealthKitManager()
     private let modelContext: ModelContext
     private let databaseInitializer: DatabaseInitializer
+    private let dataUpdater: DataUpdater
     
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
         self.databaseInitializer = DatabaseInitializer(modelContext: modelContext)
+        self.dataUpdater = DataUpdater(modelContext: modelContext)
     }
     
     public func sampleAndStoreLatestStepCount() async throws -> StepCountRecord {
@@ -94,6 +96,11 @@ public final class HealthStatsLibrary {
     // Database initialization with progress streaming
     public func initializeDatabase(for user: User) -> AsyncStream<InitializationProgress> {
         return databaseInitializer.initializeDatabase(for: user)
+    }
+    
+    // Incremental data updates with progress streaming
+    public func updateMissingData(for user: User) -> AsyncStream<InitializationProgress> {
+        return dataUpdater.updateMissingData(for: user)
     }
     
     // MARK: - Daily Analytics Queries

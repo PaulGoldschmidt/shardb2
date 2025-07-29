@@ -50,7 +50,12 @@ for await progress in healthStats.initializeDatabase(for: user) {
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
-// 9. Retrieve stored data
+// 9. Update missing data incrementally
+for await progress in healthStats.updateMissingData(for: user) {
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+
+// 10. Retrieve stored data
 let allRecords = try healthStats.getAllStepCountRecords()
 let allUsers = try healthStats.getAllUsers()
 ```
@@ -148,6 +153,7 @@ try healthStats.deleteUser(user)
 - `fetchAndStoreLast7DaysStepCount() async throws -> [StepCountRecord]` - Fetches and stores last 7 days of step data
 - `getHealthKitAuthorizationStatus(for: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus` - Checks HealthKit permission status
 - `initializeDatabase(for: User) -> AsyncStream<InitializationProgress>` - Comprehensive database initialization with detailed progress updates
+- `updateMissingData(for: User) -> AsyncStream<InitializationProgress>` - Incremental data updates based on user's lastProcessedAt timestamp
 
 ### Step Count Data Functions  
 - `getAllStepCountRecords() throws -> [StepCountRecord]` - Returns all stored step count records
@@ -240,6 +246,33 @@ try healthStats.deleteUser(user)
 **InitializationProgress**: Progress tracking for database initialization:
 - percentage (Double) - Progress percentage (0.0 to 100.0)
 - currentTask (String) - Human-readable description of current operation
+
+## Incremental Data Updates
+
+The `updateMissingData` function allows you to add missing health data incrementally based on a user's `lastProcessedAt` timestamp:
+
+```swift
+// Update missing data from lastProcessedAt to now
+for await progress in healthStats.updateMissingData(for: user) {
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+```
+
+**Key Features:**
+- Starts from the user's `lastProcessedAt` date (inclusive, to overwrite partial day data)
+- Fetches only missing HealthKit data to minimize processing time
+- Overwrites existing analytics for affected time periods to ensure accuracy
+- Updates daily → weekly → monthly → yearly analytics hierarchically
+- Provides detailed progress updates throughout the process
+- Updates user's `lastProcessedAt` timestamp upon completion
+
+**Update Process:**
+1. **Phase 1 (0-15%)**: Fetch missing HealthKit data from lastProcessedAt to now
+2. **Phase 2 (15-40%)**: Update daily analytics with overwrite logic
+3. **Phase 3 (40-65%)**: Update weekly analytics for affected weeks
+4. **Phase 4 (65-85%)**: Update monthly analytics for affected months
+5. **Phase 5 (85-95%)**: Update yearly analytics for affected years
+6. **Phase 6 (95-100%)**: Update user's lastProcessedAt timestamp
 
 ## Requirements
 
