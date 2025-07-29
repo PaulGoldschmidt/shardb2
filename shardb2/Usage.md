@@ -55,6 +55,74 @@ let allRecords = try healthStats.getAllStepCountRecords()
 let allUsers = try healthStats.getAllUsers()
 ```
 
+## Analytics Queries
+
+### Daily Analytics
+```swift
+// Get analytics for a specific date
+let todayAnalytics = try healthStats.getDailyAnalytics(for: Date())
+
+// Get analytics for a date range
+let lastWeekAnalytics = try healthStats.getDailyAnalytics(
+    from: Calendar.current.date(byAdding: .day, value: -7, to: Date())!,
+    to: Date()
+)
+
+// Get all daily analytics
+let allDaily = try healthStats.getAllDailyAnalytics()
+
+// Get latest daily analytics
+let latest = try healthStats.getLatestDailyAnalytics()
+```
+
+### Weekly Analytics
+```swift
+// Get weekly analytics for a specific date
+let thisWeekAnalytics = try healthStats.getWeeklyAnalytics(for: Date())
+
+// Get weekly analytics for a date range
+let monthlyWeeks = try healthStats.getWeeklyAnalytics(from: startDate, to: endDate)
+
+// Get all weekly analytics
+let allWeekly = try healthStats.getAllWeeklyAnalytics()
+
+// Get latest weekly analytics
+let latestWeek = try healthStats.getLatestWeeklyAnalytics()
+```
+
+### Monthly Analytics
+```swift
+// Get monthly analytics for a specific date
+let thisMonthAnalytics = try healthStats.getMonthlyAnalytics(for: Date())
+
+// Get monthly analytics by year and month
+let januaryAnalytics = try healthStats.getMonthlyAnalytics(year: 2024, month: 1)
+
+// Get all months for a specific year
+let year2024Months = try healthStats.getMonthlyAnalytics(for: 2024)
+
+// Get all monthly analytics
+let allMonthly = try healthStats.getAllMonthlyAnalytics()
+
+// Get latest monthly analytics
+let latestMonth = try healthStats.getLatestMonthlyAnalytics()
+```
+
+### Yearly Analytics
+```swift
+// Get yearly analytics for a specific date
+let thisYearAnalytics = try healthStats.getYearlyAnalytics(for: Date())
+
+// Get yearly analytics by year
+let year2024Analytics = try healthStats.getYearlyAnalytics(for: 2024)
+
+// Get all yearly analytics
+let allYearly = try healthStats.getAllYearlyAnalytics()
+
+// Get latest yearly analytics
+let latestYear = try healthStats.getLatestYearlyAnalytics()
+```
+
 ## User Management
 
 ```swift
@@ -84,6 +152,31 @@ try healthStats.deleteUser(user)
 ### Step Count Data Functions  
 - `getAllStepCountRecords() throws -> [StepCountRecord]` - Returns all stored step count records
 - `getLatestStepCountRecord() throws -> StepCountRecord?` - Returns most recent step count record
+
+### Daily Analytics Query Functions
+- `getDailyAnalytics(for: Date) throws -> DailyAnalytics?` - Get analytics for specific date
+- `getDailyAnalytics(from: Date, to: Date) throws -> [DailyAnalytics]` - Get analytics for date range
+- `getAllDailyAnalytics() throws -> [DailyAnalytics]` - Get all daily analytics
+- `getLatestDailyAnalytics() throws -> DailyAnalytics?` - Get most recent daily analytics
+
+### Weekly Analytics Query Functions
+- `getWeeklyAnalytics(for: Date) throws -> WeeklyAnalytics?` - Get weekly analytics for specific date
+- `getWeeklyAnalytics(from: Date, to: Date) throws -> [WeeklyAnalytics]` - Get weekly analytics for date range
+- `getAllWeeklyAnalytics() throws -> [WeeklyAnalytics]` - Get all weekly analytics
+- `getLatestWeeklyAnalytics() throws -> WeeklyAnalytics?` - Get most recent weekly analytics
+
+### Monthly Analytics Query Functions
+- `getMonthlyAnalytics(for: Date) throws -> MonthlyAnalytics?` - Get monthly analytics for specific date
+- `getMonthlyAnalytics(year: Int, month: Int) throws -> MonthlyAnalytics?` - Get analytics for specific year/month
+- `getMonthlyAnalytics(for: Int) throws -> [MonthlyAnalytics]` - Get all months for specific year
+- `getAllMonthlyAnalytics() throws -> [MonthlyAnalytics]` - Get all monthly analytics
+- `getLatestMonthlyAnalytics() throws -> MonthlyAnalytics?` - Get most recent monthly analytics
+
+### Yearly Analytics Query Functions
+- `getYearlyAnalytics(for: Date) throws -> YearlyAnalytics?` - Get yearly analytics for specific date
+- `getYearlyAnalytics(for: Int) throws -> YearlyAnalytics?` - Get analytics for specific year
+- `getAllYearlyAnalytics() throws -> [YearlyAnalytics]` - Get all yearly analytics
+- `getLatestYearlyAnalytics() throws -> YearlyAnalytics?` - Get most recent yearly analytics
 
 ### User Management Functions
 - `createUser(birthdate: Date, usesMetric: Bool = true) throws -> User` - Creates new user
@@ -147,3 +240,9 @@ try healthStats.deleteUser(user)
 **InitializationProgress**: Progress tracking for database initialization:
 - percentage (Double) - Progress percentage (0.0 to 100.0)
 - currentTask (String) - Human-readable description of current operation
+
+## Requirements
+
+- iOS 18+ / macOS 14+
+- HealthKit capability enabled
+- User permission for health data access
