@@ -1,5 +1,5 @@
 # shardb2 Guide
-A package to provide a interface to manage and handle statics-related health-applications in Swift. Uses SwiftData as Database abstraction and implements functions to handle often-used data requests.
+A **synchronous** Swift package for managing health statistics applications. Uses SwiftData as database abstraction and provides comprehensive health data analytics. **No async/await required** - all operations use completion callbacks for progress tracking.
 
 ## Setup
 
@@ -19,7 +19,7 @@ import HealthKit
 import shardb2
 
 // 1. Setup SwiftData with all models
-let container = try ModelContainer(for: StepCountRecord.self, User.self, DailyAnalytics.self, WeeklyAnalytics.self, MonthlyAnalytics.self, YearlyAnalytics.self)
+let container = try ModelContainer(for: User.self, DailyAnalytics.self, WeeklyAnalytics.self, MonthlyAnalytics.self, YearlyAnalytics.self)
 let context = ModelContext(container)
 
 // 2. Initialize library
@@ -28,7 +28,9 @@ let healthStats = HealthStatsLibrary(modelContext: context)
 // 3. Handle HealthKit permissions in your app
 let healthStore = HKHealthStore()
 let stepCountType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
-try await healthStore.requestAuthorization(toShare: [], read: [stepCountType])
+healthStore.requestAuthorization(toShare: [], read: [stepCountType]) { success, error in
+    // Handle authorization result
+}
 
 // 4. Create a user
 let user = try healthStats.createUser(birthdate: userBirthdate, usesMetric: true)
@@ -37,27 +39,23 @@ let user = try healthStats.createUser(birthdate: userBirthdate, usesMetric: true
 let authStatus = healthStats.getHealthKitAuthorizationStatus(for: .stepCount)
 print("HealthKit status: \(authStatus)")
 
-// 6. Sample and store step count
-let record = try await healthStats.sampleAndStoreLatestStepCount()
-print("Steps today: \(record.stepCount)")
-
-// 7. Fetch and store last 7 days of data
-let weeklyRecords = try await healthStats.fetchAndStoreLast7DaysStepCount()
-print("Fetched \(weeklyRecords.count) days of data")
+// 6. Initialize database with comprehensive health data
+// This fetches all health metrics (steps, heart rate, sleep, etc.) and processes them into analytics
 
 // 8. Initialize database with detailed progress tracking
-for await progress in healthStats.initializeDatabase(for: user) {
+try healthStats.initializeDatabase(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
 // 9. Update missing data incrementally
-for await progress in healthStats.updateMissingData(for: user) {
+try healthStats.updateMissingData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
 // 10. Retrieve stored data
-let allRecords = try healthStats.getAllStepCountRecords()
+let todaySteps = try healthStats.getDailyAnalytics(for: Date())?.steps ?? 0
 let allUsers = try healthStats.getAllUsers()
+print("Steps today: \(todaySteps)")
 ```
 
 ## Analytics Queries
@@ -149,15 +147,9 @@ try healthStats.deleteUser(user)
 ## Complete HealthStatsLibrary API Reference
 
 ### HealthKit Data Functions
-- `sampleAndStoreLatestStepCount() async throws -> StepCountRecord` - Fetches today's step count and stores it
-- `fetchAndStoreLast7DaysStepCount() async throws -> [StepCountRecord]` - Fetches and stores last 7 days of step data
 - `getHealthKitAuthorizationStatus(for: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus` - Checks HealthKit permission status
-- `initializeDatabase(for: User) -> AsyncStream<InitializationProgress>` - Comprehensive database initialization with detailed progress updates
-- `updateMissingData(for: User) -> AsyncStream<InitializationProgress>` - Incremental data updates based on user's lastProcessedAt timestamp
-
-### Step Count Data Functions  
-- `getAllStepCountRecords() throws -> [StepCountRecord]` - Returns all stored step count records
-- `getLatestStepCountRecord() throws -> StepCountRecord?` - Returns most recent step count record
+- `initializeDatabase(for: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - Comprehensive database initialization with detailed progress updates
+- `updateMissingData(for: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - Incremental data updates based on user's lastProcessedAt timestamp
 
 ### Daily Analytics Query Functions
 - `getDailyAnalytics(for: Date) throws -> DailyAnalytics?` - Get analytics for specific date
@@ -192,8 +184,6 @@ try healthStats.deleteUser(user)
 - `deleteUser(_ user: User) throws` - Removes user from database
 
 ### Data Models
-
-**StepCountRecord**: stepCount (Int), date (Date), recordedAt (Date)
 
 **User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
 
@@ -253,7 +243,7 @@ The `updateMissingData` function allows you to add missing health data increment
 
 ```swift
 // Update missing data from lastProcessedAt to now
-for await progress in healthStats.updateMissingData(for: user) {
+try healthStats.updateMissingData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 ```
@@ -279,3 +269,12 @@ for await progress in healthStats.updateMissingData(for: user) {
 - iOS 18+ / macOS 14+
 - HealthKit capability enabled
 - User permission for health data access
+
+## Key Features
+
+- **Fully Synchronous**: No async/await required - all operations are synchronous with callback-based progress reporting
+- **Swift 6 Compatible**: No concurrency warnings or issues
+- **Comprehensive Health Data**: Supports 14+ HealthKit data types including steps, heart rate, sleep, and exercise metrics
+- **Multi-level Analytics**: Automatic aggregation into daily, weekly, monthly, and yearly analytics
+- **Incremental Updates**: Efficient data updates based on last processed timestamp
+- **SwiftData Integration**: Modern Core Data abstraction for reliable persistence

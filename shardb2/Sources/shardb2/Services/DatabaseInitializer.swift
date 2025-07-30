@@ -10,54 +10,45 @@ public final class DatabaseInitializer {
         self.modelContext = modelContext
     }
     
-    public func initializeDatabase(for user: User) -> AsyncStream<InitializationProgress> {
-        return AsyncStream<InitializationProgress> { continuation in
-            Task {
-                do {
-                    try await performInitialization(for: user, progressContinuation: continuation)
-                    continuation.finish()
-                } catch {
-                    continuation.finish()
-                }
-            }
-        }
+    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+        try performInitialization(for: user, progressCallback: progressCallback)
     }
     
-    private func performInitialization(for user: User, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func performInitialization(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let startDate = user.firstHealthKitRecord
         let endDate = Date()
         
         // Phase 1: Fetch all HealthKit data (1% to 10% of total progress)
-        progressContinuation.yield(InitializationProgress(percentage: 0.0, currentTask: "Starting database initialization..."))
+        progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting database initialization..."))
         
-        let dailyHealthData = try await healthDataAggregator.fetchAllHealthData(from: startDate, to: endDate) { progress in
-            progressContinuation.yield(progress)
+        let dailyHealthData = try healthDataAggregator.fetchAllHealthData(from: startDate, to: endDate) { progress in
+            progressCallback(progress)
         }
         let totalDays = dailyHealthData.count
         
-        progressContinuation.yield(InitializationProgress(percentage: 10.0, currentTask: "HealthKit data fetching completed"))
+        progressCallback(InitializationProgress(percentage: 10.0, currentTask: "HealthKit data fetching completed"))
         
         // Phase 2: Create daily analytics (30% of progress, 10-40%)
-        try await createDailyAnalytics(from: dailyHealthData, totalDays: totalDays, progressContinuation: progressContinuation)
+        try createDailyAnalytics(from: dailyHealthData, totalDays: totalDays, progressCallback: progressCallback)
         
         // Phase 3: Create weekly analytics (20% of progress, 40-60%)
-        try await createWeeklyAnalytics(from: dailyHealthData, progressContinuation: progressContinuation)
+        try createWeeklyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
         // Phase 4: Create monthly analytics (15% of progress, 60-75%)
-        try await createMonthlyAnalytics(from: dailyHealthData, progressContinuation: progressContinuation)
+        try createMonthlyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
         // Phase 5: Create yearly analytics (15% of progress, 75-90%)
-        try await createYearlyAnalytics(from: dailyHealthData, progressContinuation: progressContinuation)
+        try createYearlyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
         // Phase 6: Update user (10% of progress, 90-100%)
-        progressContinuation.yield(InitializationProgress(percentage: 90.0, currentTask: "Updating user record..."))
+        progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Updating user record..."))
         user.lastProcessedAt = Date()
         try modelContext.save()
         
-        progressContinuation.yield(InitializationProgress(percentage: 100.0, currentTask: "Database initialization completed!"))
+        progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Database initialization completed!"))
     }
     
-    private func createDailyAnalytics(from dailyData: [Date: HealthDataPoint], totalDays: Int, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func createDailyAnalytics(from dailyData: [Date: HealthDataPoint], totalDays: Int, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let sortedDates = dailyData.keys.sorted()
         var processedDays = 0
         var currentID = 1
@@ -95,7 +86,7 @@ public final class DatabaseInitializer {
             let progress = 10.0 + (Double(processedDays) / Double(totalDays)) * 30.0
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Processing daily analytics for \(dateFormatter.string(from: date))..."))
             
@@ -108,7 +99,7 @@ public final class DatabaseInitializer {
         try modelContext.save()
     }
     
-    private func createWeeklyAnalytics(from dailyData: [Date: HealthDataPoint], progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func createWeeklyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         let sortedDates = dailyData.keys.sorted()
         
@@ -170,7 +161,7 @@ public final class DatabaseInitializer {
             let progress = 40.0 + (Double(processedWeeks) / Double(totalWeeks)) * 20.0
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Processing weekly analytics for week of \(dateFormatter.string(from: weekStart))..."))
         }
@@ -178,7 +169,7 @@ public final class DatabaseInitializer {
         try modelContext.save()
     }
     
-    private func createMonthlyAnalytics(from dailyData: [Date: HealthDataPoint], progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func createMonthlyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         let sortedDates = dailyData.keys.sorted()
         
@@ -243,7 +234,7 @@ public final class DatabaseInitializer {
             // Update progress (60% to 75%)
             let progress = 60.0 + (Double(processedMonths) / Double(totalMonths)) * 15.0
             let monthName = DateFormatter().monthSymbols[month - 1]
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Processing monthly analytics for \(monthName) \(year)..."))
         }
@@ -251,7 +242,7 @@ public final class DatabaseInitializer {
         try modelContext.save()
     }
     
-    private func createYearlyAnalytics(from dailyData: [Date: HealthDataPoint], progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func createYearlyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         let sortedDates = dailyData.keys.sorted()
         
@@ -309,7 +300,7 @@ public final class DatabaseInitializer {
             
             // Update progress (75% to 90%)
             let progress = 75.0 + (Double(processedYears) / Double(totalYears)) * 15.0
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Processing yearly analytics for \(year)..."))
         }

@@ -10,20 +10,11 @@ public final class DataUpdater {
         self.modelContext = modelContext
     }
     
-    public func updateMissingData(for user: User) -> AsyncStream<InitializationProgress> {
-        return AsyncStream<InitializationProgress> { continuation in
-            Task {
-                do {
-                    try await performDataUpdate(for: user, progressContinuation: continuation)
-                    continuation.finish()
-                } catch {
-                    continuation.finish()
-                }
-            }
-        }
+    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+        try performDataUpdate(for: user, progressCallback: progressCallback)
     }
     
-    private func performDataUpdate(for user: User, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func performDataUpdate(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         let now = Date()
         
@@ -32,44 +23,44 @@ public final class DataUpdater {
         let endDate = calendar.startOfDay(for: now)
         
         guard startDate <= endDate else {
-            progressContinuation.yield(InitializationProgress(percentage: 100.0, currentTask: "No missing data to process"))
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: "No missing data to process"))
             return
         }
         
-        progressContinuation.yield(InitializationProgress(percentage: 0.0, currentTask: "Starting incremental data update..."))
+        progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting incremental data update..."))
         
         // Phase 1: Fetch missing HealthKit data (0-15%)
-        let dailyHealthData = try await healthDataAggregator.fetchAllHealthData(from: startDate, to: now) { progress in
+        let dailyHealthData = try healthDataAggregator.fetchAllHealthData(from: startDate, to: now) { progress in
             let adjustedProgress = InitializationProgress(
                 percentage: progress.percentage * 0.15, // Scale to 15%
                 currentTask: progress.currentTask
             )
-            progressContinuation.yield(adjustedProgress)
+            progressCallback(adjustedProgress)
         }
         
-        progressContinuation.yield(InitializationProgress(percentage: 15.0, currentTask: "HealthKit data fetching completed"))
+        progressCallback(InitializationProgress(percentage: 15.0, currentTask: "HealthKit data fetching completed"))
         
         // Phase 2: Update daily analytics (15-40%)
-        try await updateDailyAnalytics(from: dailyHealthData, progressContinuation: progressContinuation)
+        try updateDailyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
         // Phase 3: Update weekly analytics (40-65%)
-        try await updateWeeklyAnalytics(for: startDate, to: endDate, progressContinuation: progressContinuation)
+        try updateWeeklyAnalytics(for: startDate, to: endDate, progressCallback: progressCallback)
         
         // Phase 4: Update monthly analytics (65-85%)
-        try await updateMonthlyAnalytics(for: startDate, to: endDate, progressContinuation: progressContinuation)
+        try updateMonthlyAnalytics(for: startDate, to: endDate, progressCallback: progressCallback)
         
         // Phase 5: Update yearly analytics (85-95%)
-        try await updateYearlyAnalytics(for: startDate, to: endDate, progressContinuation: progressContinuation)
+        try updateYearlyAnalytics(for: startDate, to: endDate, progressCallback: progressCallback)
         
         // Phase 6: Update user record (95-100%)
-        progressContinuation.yield(InitializationProgress(percentage: 95.0, currentTask: "Updating user record..."))
+        progressCallback(InitializationProgress(percentage: 95.0, currentTask: "Updating user record..."))
         user.lastProcessedAt = now
         try modelContext.save()
         
-        progressContinuation.yield(InitializationProgress(percentage: 100.0, currentTask: "Incremental update completed!"))
+        progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Incremental update completed!"))
     }
     
-    private func updateDailyAnalytics(from dailyData: [Date: HealthDataPoint], progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func updateDailyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let sortedDates = dailyData.keys.sorted()
         let totalDays = sortedDates.count
         var processedDays = 0
@@ -135,7 +126,7 @@ public final class DataUpdater {
             let progress = 15.0 + (Double(processedDays) / Double(totalDays)) * 25.0
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Updating daily analytics for \(dateFormatter.string(from: date))..."))
             
@@ -148,7 +139,7 @@ public final class DataUpdater {
         try modelContext.save()
     }
     
-    private func updateWeeklyAnalytics(for startDate: Date, to endDate: Date, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func updateWeeklyAnalytics(for startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         
         // Get all weeks that need updating
@@ -180,7 +171,7 @@ public final class DataUpdater {
             let progress = 40.0 + (Double(processedWeeks) / Double(totalWeeks)) * 25.0
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .medium
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Updating weekly analytics for week of \(dateFormatter.string(from: weekRange.start))..."))
         }
@@ -188,7 +179,7 @@ public final class DataUpdater {
         try modelContext.save()
     }
     
-    private func updateMonthlyAnalytics(for startDate: Date, to endDate: Date, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func updateMonthlyAnalytics(for startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         
         // Get all months that need updating
@@ -222,7 +213,7 @@ public final class DataUpdater {
             
             let progress = 65.0 + (Double(processedMonths) / Double(totalMonths)) * 20.0
             let monthName = DateFormatter().monthSymbols[components.month! - 1]
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Updating monthly analytics for \(monthName) \(components.year!)..."))
         }
@@ -230,7 +221,7 @@ public final class DataUpdater {
         try modelContext.save()
     }
     
-    private func updateYearlyAnalytics(for startDate: Date, to endDate: Date, progressContinuation: AsyncStream<InitializationProgress>.Continuation) async throws {
+    private func updateYearlyAnalytics(for startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
         
         // Get all years that need updating
@@ -262,7 +253,7 @@ public final class DataUpdater {
             processedYears += 1
             
             let progress = 85.0 + (Double(processedYears) / Double(totalYears)) * 10.0
-            progressContinuation.yield(InitializationProgress(
+            progressCallback(InitializationProgress(
                 percentage: progress,
                 currentTask: "Updating yearly analytics for \(year)..."))
         }
@@ -273,7 +264,7 @@ public final class DataUpdater {
     // MARK: - Helper Functions
     
     private func getHighestDailyAnalyticsID() throws -> Int {
-        let descriptor = FetchDescriptor<DailyAnalytics>(
+        var descriptor = FetchDescriptor<DailyAnalytics>(
             sortBy: [SortDescriptor(\.id, order: .reverse)]
         )
         descriptor.fetchLimit = 1
@@ -281,7 +272,7 @@ public final class DataUpdater {
     }
     
     private func getHighestWeeklyAnalyticsID() throws -> Int {
-        let descriptor = FetchDescriptor<WeeklyAnalytics>(
+        var descriptor = FetchDescriptor<WeeklyAnalytics>(
             sortBy: [SortDescriptor(\.id, order: .reverse)]
         )
         descriptor.fetchLimit = 1
@@ -289,7 +280,7 @@ public final class DataUpdater {
     }
     
     private func getHighestMonthlyAnalyticsID() throws -> Int {
-        let descriptor = FetchDescriptor<MonthlyAnalytics>(
+        var descriptor = FetchDescriptor<MonthlyAnalytics>(
             sortBy: [SortDescriptor(\.id, order: .reverse)]
         )
         descriptor.fetchLimit = 1
@@ -297,7 +288,7 @@ public final class DataUpdater {
     }
     
     private func getHighestYearlyAnalyticsID() throws -> Int {
-        let descriptor = FetchDescriptor<YearlyAnalytics>(
+        var descriptor = FetchDescriptor<YearlyAnalytics>(
             sortBy: [SortDescriptor(\.id, order: .reverse)]
         )
         descriptor.fetchLimit = 1

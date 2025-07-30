@@ -6,7 +6,7 @@ public final class HealthDataAggregator {
     
     public init() {}
     
-    public func fetchAllHealthData(from startDate: Date, to endDate: Date, progressCallback: (InitializationProgress) -> Void) async throws -> [Date: HealthDataPoint] {
+    public func fetchAllHealthData(from startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws -> [Date: HealthDataPoint] {
         let quantityTypes = getHealthKitQuantityTypes()
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
         
@@ -32,7 +32,7 @@ public final class HealthDataAggregator {
                 currentTask: "Fetching \(typeName) data..."
             ))
             
-            let samples = try await fetchSamples(for: quantityType, predicate: predicate)
+            let samples = try fetchSamples(for: quantityType, predicate: predicate)
             processSamples(samples, into: &dailyData, calendar: calendar)
         }
         
@@ -43,32 +43,40 @@ public final class HealthDataAggregator {
                 currentTask: "Fetching Sleep Analysis data..."
             ))
             
-            let sleepSamples = try await fetchSleepSamples(for: sleepType, predicate: predicate)
+            let sleepSamples = try fetchSleepSamples(for: sleepType, predicate: predicate)
             processSleepSamples(sleepSamples, into: &dailyData, calendar: calendar)
         }
         
         return dailyData
     }
     
-    private func fetchSamples(for quantityType: HKQuantityType, predicate: NSPredicate) async throws -> [HKQuantitySample] {
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKSampleQuery(
-                sampleType: quantityType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
-            ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: HealthKitError.queryFailed(error))
-                    return
-                }
-                
-                let quantitySamples = samples as? [HKQuantitySample] ?? []
-                continuation.resume(returning: quantitySamples)
+    private func fetchSamples(for quantityType: HKQuantityType, predicate: NSPredicate) throws -> [HKQuantitySample] {
+        var result: [HKQuantitySample] = []
+        var queryError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        let query = HKSampleQuery(
+            sampleType: quantityType,
+            predicate: predicate,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
+        ) { _, samples, error in
+            if let error = error {
+                queryError = HealthKitError.queryFailed(error)
+            } else {
+                result = samples as? [HKQuantitySample] ?? []
             }
-            
-            healthStore.execute(query)
+            semaphore.signal()
         }
+        
+        healthStore.execute(query)
+        semaphore.wait()
+        
+        if let error = queryError {
+            throw error
+        }
+        
+        return result
     }
     
     private func processSamples(_ samples: [HKQuantitySample], into dailyData: inout [Date: HealthDataPoint], calendar: Calendar) {
@@ -156,25 +164,33 @@ public final class HealthDataAggregator {
         }
     }
     
-    private func fetchSleepSamples(for categoryType: HKCategoryType, predicate: NSPredicate) async throws -> [HKCategorySample] {
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKSampleQuery(
-                sampleType: categoryType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
-            ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: HealthKitError.queryFailed(error))
-                    return
-                }
-                
-                let categorySamples = samples as? [HKCategorySample] ?? []
-                continuation.resume(returning: categorySamples)
+    private func fetchSleepSamples(for categoryType: HKCategoryType, predicate: NSPredicate) throws -> [HKCategorySample] {
+        var result: [HKCategorySample] = []
+        var queryError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        let query = HKSampleQuery(
+            sampleType: categoryType,
+            predicate: predicate,
+            limit: HKObjectQueryNoLimit,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
+        ) { _, samples, error in
+            if let error = error {
+                queryError = HealthKitError.queryFailed(error)
+            } else {
+                result = samples as? [HKCategorySample] ?? []
             }
-            
-            healthStore.execute(query)
+            semaphore.signal()
         }
+        
+        healthStore.execute(query)
+        semaphore.wait()
+        
+        if let error = queryError {
+            throw error
+        }
+        
+        return result
     }
     
     private func processSleepSamples(_ samples: [HKCategorySample], into dailyData: inout [Date: HealthDataPoint], calendar: Calendar) {

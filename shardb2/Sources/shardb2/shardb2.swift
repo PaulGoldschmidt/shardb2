@@ -53,14 +53,14 @@ public final class HealthStatsLibrary {
     }
     
     
-    // Database initialization with progress streaming
-    public func initializeDatabase(for user: User) -> AsyncStream<InitializationProgress> {
-        return databaseInitializer.initializeDatabase(for: user)
+    // Database initialization with progress callback
+    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+        try databaseInitializer.initializeDatabase(for: user, progressCallback: progressCallback)
     }
     
-    // Incremental data updates with progress streaming
-    public func updateMissingData(for user: User) -> AsyncStream<InitializationProgress> {
-        return dataUpdater.updateMissingData(for: user)
+    // Incremental data updates with progress callback
+    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+        try dataUpdater.updateMissingData(for: user, progressCallback: progressCallback)
     }
     
     // MARK: - Daily Analytics Queries
