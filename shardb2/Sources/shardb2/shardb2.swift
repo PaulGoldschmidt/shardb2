@@ -716,20 +716,50 @@ public final class HealthStatsLibrary {
     }
     
     private func aggregateDailyDataForYear(_ yearStart: Date, _ yearEnd: Date) throws -> HealthDataPoint {
-        let descriptor = FetchDescriptor<DailyAnalytics>(
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: yearStart)
+        
+        // Aggregate from monthly analytics instead of daily analytics for better performance
+        let descriptor = FetchDescriptor<MonthlyAnalytics>(
             predicate: #Predicate { analytics in
-                analytics.date >= yearStart && analytics.date <= yearEnd
+                analytics.year == year
             }
         )
         
-        let dailyRecords = try modelContext.fetch(descriptor)
-        return aggregateHealthDataFromDailyAnalytics(dailyRecords)
+        let monthlyRecords = try modelContext.fetch(descriptor)
+        return aggregateHealthDataFromMonthlyAnalytics(monthlyRecords)
     }
     
     private func aggregateHealthDataFromDailyAnalytics(_ dailyRecords: [DailyAnalytics]) -> HealthDataPoint {
         var aggregated = HealthDataPoint()
         
         for record in dailyRecords {
+            aggregated.steps += record.steps
+            aggregated.cyclingDistance += record.cyclingDistance
+            aggregated.walkingDistance += record.walkingDistance
+            aggregated.runningDistance += record.runningDistance
+            aggregated.swimmingDistance += record.swimmingDistance
+            aggregated.swimmingStrokes += record.swimmingStrokes
+            aggregated.crossCountrySkiingDistance += record.crossCountrySkiingDistance
+            aggregated.downhillSnowSportsDistance += record.downhillSnowSportsDistance
+            aggregated.energyActive += record.energyActive
+            aggregated.energyResting += record.energyResting
+            aggregated.heartbeats += record.heartbeats
+            aggregated.stairsClimbed += record.stairsClimbed
+            aggregated.exerciseMinutes += record.exerciseMinutes
+            aggregated.standMinutes += record.standMinutes
+            aggregated.sleepTotal += record.sleepTotal
+            aggregated.sleepDeep += record.sleepDeep
+            aggregated.sleepREM += record.sleepREM
+        }
+        
+        return aggregated
+    }
+    
+    private func aggregateHealthDataFromMonthlyAnalytics(_ monthlyRecords: [MonthlyAnalytics]) -> HealthDataPoint {
+        var aggregated = HealthDataPoint()
+        
+        for record in monthlyRecords {
             aggregated.steps += record.steps
             aggregated.cyclingDistance += record.cyclingDistance
             aggregated.walkingDistance += record.walkingDistance

@@ -105,25 +105,25 @@ public final class DatabaseInitializer {
     
     private func createWeeklyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
-        let sortedDates = dailyData.keys.sorted()
         
-        guard let firstDate = sortedDates.first, let lastDate = sortedDates.last else { return }
+        // Get all daily analytics from the database (already stored)
+        let allDailyAnalytics = try getAllDailyAnalyticsFromDB()
+        
+        guard !allDailyAnalytics.isEmpty else { return }
         
         var weeklyData: [Date: HealthDataPoint] = [:]
-        _ = calendar.dateInterval(of: .weekOfYear, for: firstDate)?.start ?? firstDate
-        _ = calendar.dateInterval(of: .weekOfYear, for: lastDate)?.start ?? lastDate
         
-        // Group daily data by weeks
-        for date in sortedDates {
-            let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
+        // Group daily analytics by weeks
+        for dailyAnalytic in allDailyAnalytics {
+            let weekStart = calendar.dateInterval(of: .weekOfYear, for: dailyAnalytic.date)?.start ?? dailyAnalytic.date
             
             if weeklyData[weekStart] == nil {
                 weeklyData[weekStart] = HealthDataPoint()
             }
             
-            if let dailyPoint = dailyData[date] {
-                weeklyData[weekStart] = aggregateHealthData(weeklyData[weekStart]!, with: dailyPoint)
-            }
+            // Aggregate from daily analytics in database
+            let dailyPoint = convertDailyAnalyticsToHealthDataPoint(dailyAnalytic)
+            weeklyData[weekStart] = aggregateHealthData(weeklyData[weekStart]!, with: dailyPoint)
         }
         
         // Create weekly analytics records
@@ -175,22 +175,26 @@ public final class DatabaseInitializer {
     
     private func createMonthlyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
         let calendar = Calendar.current
-        let sortedDates = dailyData.keys.sorted()
+        
+        // Get all daily analytics from the database (already stored)
+        let allDailyAnalytics = try getAllDailyAnalyticsFromDB()
+        
+        guard !allDailyAnalytics.isEmpty else { return }
         
         var monthlyData: [String: HealthDataPoint] = [:]
         
-        // Group daily data by months
-        for date in sortedDates {
-            let components = calendar.dateComponents([.year, .month], from: date)
+        // Group daily analytics by months
+        for dailyAnalytic in allDailyAnalytics {
+            let components = calendar.dateComponents([.year, .month], from: dailyAnalytic.date)
             let monthKey = "\(components.year!)-\(components.month!)"
             
             if monthlyData[monthKey] == nil {
                 monthlyData[monthKey] = HealthDataPoint()
             }
             
-            if let dailyPoint = dailyData[date] {
-                monthlyData[monthKey] = aggregateHealthData(monthlyData[monthKey]!, with: dailyPoint)
-            }
+            // Aggregate from daily analytics in database
+            let dailyPoint = convertDailyAnalyticsToHealthDataPoint(dailyAnalytic)
+            monthlyData[monthKey] = aggregateHealthData(monthlyData[monthKey]!, with: dailyPoint)
         }
         
         // Create monthly analytics records
@@ -247,22 +251,24 @@ public final class DatabaseInitializer {
     }
     
     private func createYearlyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        let calendar = Calendar.current
-        let sortedDates = dailyData.keys.sorted()
+        // Get all monthly analytics from the database (already stored)
+        let allMonthlyAnalytics = try getAllMonthlyAnalyticsFromDB()
+        
+        guard !allMonthlyAnalytics.isEmpty else { return }
         
         var yearlyData: [Int: HealthDataPoint] = [:]
         
-        // Group daily data by years
-        for date in sortedDates {
-            let year = calendar.component(.year, from: date)
+        // Group monthly analytics by years
+        for monthlyAnalytic in allMonthlyAnalytics {
+            let year = monthlyAnalytic.year
             
             if yearlyData[year] == nil {
                 yearlyData[year] = HealthDataPoint()
             }
             
-            if let dailyPoint = dailyData[date] {
-                yearlyData[year] = aggregateHealthData(yearlyData[year]!, with: dailyPoint)
-            }
+            // Aggregate from monthly analytics in database
+            let monthlyPoint = convertMonthlyAnalyticsToHealthDataPoint(monthlyAnalytic)
+            yearlyData[year] = aggregateHealthData(yearlyData[year]!, with: monthlyPoint)
         }
         
         // Create yearly analytics records
@@ -405,5 +411,65 @@ public final class DatabaseInitializer {
         
         highscoreRecord.lastUpdated = Date()
         try modelContext.save()
+    }
+    
+    // MARK: - Helper Functions for Database Aggregation
+    
+    private func getAllDailyAnalyticsFromDB() throws -> [DailyAnalytics] {
+        let descriptor = FetchDescriptor<DailyAnalytics>(
+            sortBy: [SortDescriptor(\.date, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+    
+    private func getAllMonthlyAnalyticsFromDB() throws -> [MonthlyAnalytics] {
+        let descriptor = FetchDescriptor<MonthlyAnalytics>(
+            sortBy: [SortDescriptor(\.year, order: .forward), SortDescriptor(\.month, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor)
+    }
+    
+    private func convertDailyAnalyticsToHealthDataPoint(_ daily: DailyAnalytics) -> HealthDataPoint {
+        var point = HealthDataPoint()
+        point.steps = daily.steps
+        point.cyclingDistance = daily.cyclingDistance
+        point.walkingDistance = daily.walkingDistance
+        point.runningDistance = daily.runningDistance
+        point.swimmingDistance = daily.swimmingDistance
+        point.swimmingStrokes = daily.swimmingStrokes
+        point.crossCountrySkiingDistance = daily.crossCountrySkiingDistance
+        point.downhillSnowSportsDistance = daily.downhillSnowSportsDistance
+        point.energyActive = daily.energyActive
+        point.energyResting = daily.energyResting
+        point.heartbeats = daily.heartbeats
+        point.stairsClimbed = daily.stairsClimbed
+        point.exerciseMinutes = daily.exerciseMinutes
+        point.standMinutes = daily.standMinutes
+        point.sleepTotal = daily.sleepTotal
+        point.sleepDeep = daily.sleepDeep
+        point.sleepREM = daily.sleepREM
+        return point
+    }
+    
+    private func convertMonthlyAnalyticsToHealthDataPoint(_ monthly: MonthlyAnalytics) -> HealthDataPoint {
+        var point = HealthDataPoint()
+        point.steps = monthly.steps
+        point.cyclingDistance = monthly.cyclingDistance
+        point.walkingDistance = monthly.walkingDistance
+        point.runningDistance = monthly.runningDistance
+        point.swimmingDistance = monthly.swimmingDistance
+        point.swimmingStrokes = monthly.swimmingStrokes
+        point.crossCountrySkiingDistance = monthly.crossCountrySkiingDistance
+        point.downhillSnowSportsDistance = monthly.downhillSnowSportsDistance
+        point.energyActive = monthly.energyActive
+        point.energyResting = monthly.energyResting
+        point.heartbeats = monthly.heartbeats
+        point.stairsClimbed = monthly.stairsClimbed
+        point.exerciseMinutes = monthly.exerciseMinutes
+        point.standMinutes = monthly.standMinutes
+        point.sleepTotal = monthly.sleepTotal
+        point.sleepDeep = monthly.sleepDeep
+        point.sleepREM = monthly.sleepREM
+        return point
     }
 }
