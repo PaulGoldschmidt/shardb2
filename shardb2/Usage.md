@@ -40,7 +40,8 @@ let authStatus = healthStats.getHealthKitAuthorizationStatus(for: .stepCount)
 print("HealthKit status: \(authStatus)")
 
 // 6. Initialize database with comprehensive health data
-// This fetches all health metrics (steps, heart rate, sleep, etc.) and processes them into analytics
+// This fetches ALL available health data from September 2014 (HealthKit launch) to present
+// and processes them into daily, weekly, monthly, and yearly analytics
 
 // 8. Initialize database with detailed progress tracking
 try healthStats.initializeDatabase(for: user) { progress in
@@ -142,6 +143,9 @@ try healthStats.updateUser(user)
 
 // Delete user
 try healthStats.deleteUser(user)
+
+// Clear all analytics data while preserving user data
+try healthStats.clearDatabaseExceptUser(user)
 ```
 
 ## Complete HealthStatsLibrary API Reference
@@ -182,6 +186,9 @@ try healthStats.deleteUser(user)
 - `getAllUsers() throws -> [User]` - Returns all users
 - `updateUser(_ user: User) throws` - Saves user changes
 - `deleteUser(_ user: User) throws` - Removes user from database
+
+### Database Management Functions
+- `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 for full reprocessing
 
 ### Data Models
 

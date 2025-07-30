@@ -33,6 +33,13 @@ public final class HealthDataAggregator {
             ))
             
             let samples = try fetchSamples(for: quantityType, predicate: predicate)
+            
+            // Enhanced logging for sample details
+            progressCallback(InitializationProgress(
+                percentage: progress + 0.5,
+                currentTask: "Processing \(samples.count) \(typeName) samples..."
+            ))
+            
             processSamples(samples, into: &dailyData, calendar: calendar)
         }
         
@@ -44,8 +51,23 @@ public final class HealthDataAggregator {
             ))
             
             let sleepSamples = try fetchSleepSamples(for: sleepType, predicate: predicate)
+            
+            progressCallback(InitializationProgress(
+                percentage: 8.5,
+                currentTask: "Processing \(sleepSamples.count) Sleep Analysis samples..."
+            ))
+            
             processSleepSamples(sleepSamples, into: &dailyData, calendar: calendar)
         }
+        
+        // Final logging of processed data
+        let totalDays = dailyData.count
+        let daysWithSteps = dailyData.values.filter { $0.steps > 0 }.count
+        
+        progressCallback(InitializationProgress(
+            percentage: 9.0,
+            currentTask: "Processed \(totalDays) days of data (\(daysWithSteps) days with steps)"
+        ))
         
         return dailyData
     }

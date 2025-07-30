@@ -47,6 +47,29 @@ public final class HealthStatsLibrary {
         try modelContext.save()
     }
     
+    // MARK: - Database Management
+    
+    public func clearDatabaseExceptUser(_ user: User) throws {
+        // Clear all analytics but keep user data
+        let dailyAnalytics = try getAllDailyAnalytics()
+        let weeklyAnalytics = try getAllWeeklyAnalytics()
+        let monthlyAnalytics = try getAllMonthlyAnalytics()
+        let yearlyAnalytics = try getAllYearlyAnalytics()
+        
+        // Delete analytics records
+        for record in dailyAnalytics { modelContext.delete(record) }
+        for record in weeklyAnalytics { modelContext.delete(record) }
+        for record in monthlyAnalytics { modelContext.delete(record) }
+        for record in yearlyAnalytics { modelContext.delete(record) }
+        
+        try modelContext.save()
+        
+        // Reset user's lastProcessedAt to force full reprocessing
+        let resetDate = DateComponents(calendar: Calendar.current, year: 1999, month: 1, day: 1).date!
+        user.lastProcessedAt = resetDate
+        try updateUser(user)
+    }
+    
     // HealthKit authorization status
     public func getHealthKitAuthorizationStatus(for type: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus {
         return healthKitManager.getAuthorizationStatus(for: type)
