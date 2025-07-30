@@ -39,8 +39,11 @@ let user = try healthStats.createUser(birthdate: userBirthdate, usesMetric: true
 let authStatus = healthStats.getHealthKitAuthorizationStatus(for: .stepCount)
 print("HealthKit status: \(authStatus)")
 
-// 6. Initialize database with comprehensive health data
-// This fetches ALL available health data from September 2014 (HealthKit launch) to present
+// 6. Set the user's actual first HealthKit record date (recommended after authorization)
+try healthStats.setUserFirstHealthKitRecord(user)
+
+// 7. Initialize database with comprehensive health data
+// This fetches ALL available health data from the user's first HealthKit sample to present
 // and processes them into daily, weekly, monthly, and yearly analytics
 
 // 8. Initialize database with detailed progress tracking
@@ -188,7 +191,8 @@ try healthStats.clearDatabaseExceptUser(user)
 - `deleteUser(_ user: User) throws` - Removes user from database
 
 ### Database Management Functions
-- `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 for full reprocessing
+- `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 and re-detects firstHealthKitRecord for full reprocessing
+- `setUserFirstHealthKitRecord(_ user: User) throws` - Queries HealthKit to find the user's earliest sample and sets firstHealthKitRecord accordingly
 
 ### Data Models
 

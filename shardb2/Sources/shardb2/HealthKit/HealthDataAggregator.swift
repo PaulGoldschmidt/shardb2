@@ -6,6 +6,31 @@ public final class HealthDataAggregator {
     
     public init() {}
     
+    public func findEarliestHealthKitSample() throws -> Date {
+        let quantityTypes = getHealthKitQuantityTypes()
+        var earliestDate: Date?
+        
+        // Check quantity types (steps, heart rate, etc.)
+        for quantityType in quantityTypes {
+            if let sampleDate = try fetchEarliestSampleDate(for: quantityType) {
+                if earliestDate == nil || sampleDate < earliestDate! {
+                    earliestDate = sampleDate
+                }
+            }
+        }
+        
+        // Check sleep analysis (category type)
+        if let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
+           let sleepDate = try fetchEarliestSleepSampleDate(for: sleepType) {
+            if earliestDate == nil || sleepDate < earliestDate! {
+                earliestDate = sleepDate
+            }
+        }
+        
+        // Return the earliest date found, or fallback to HealthKit launch date
+        return earliestDate ?? DateComponents(calendar: Calendar.current, year: 2014, month: 9, day: 1).date!
+    }
+    
     public func fetchAllHealthData(from startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws -> [Date: HealthDataPoint] {
         let quantityTypes = getHealthKitQuantityTypes()
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
@@ -267,4 +292,64 @@ public struct HealthDataPoint {
     public var sleepTotal: Int = 0
     public var sleepDeep: Int = 0
     public var sleepREM: Int = 0
+}
+
+extension HealthDataAggregator {
+    private func fetchEarliestSampleDate(for quantityType: HKQuantityType) throws -> Date? {
+        var result: Date?
+        var queryError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        let query = HKSampleQuery(
+            sampleType: quantityType,
+            predicate: nil, // No date filter - we want the earliest sample ever
+            limit: 1,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { _, samples, error in
+            if let error = error {
+                queryError = HealthKitError.queryFailed(error)
+            } else if let sample = samples?.first {
+                result = sample.startDate
+            }
+            semaphore.signal()
+        }
+        
+        healthStore.execute(query)
+        semaphore.wait()
+        
+        if let error = queryError {
+            throw error
+        }
+        
+        return result
+    }
+    
+    private func fetchEarliestSleepSampleDate(for categoryType: HKCategoryType) throws -> Date? {
+        var result: Date?
+        var queryError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        let query = HKSampleQuery(
+            sampleType: categoryType,
+            predicate: nil, // No date filter - we want the earliest sample ever
+            limit: 1,
+            sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        ) { _, samples, error in
+            if let error = error {
+                queryError = HealthKitError.queryFailed(error)
+            } else if let sample = samples?.first {
+                result = sample.startDate
+            }
+            semaphore.signal()
+        }
+        
+        healthStore.execute(query)
+        semaphore.wait()
+        
+        if let error = queryError {
+            throw error
+        }
+        
+        return result
+    }
 }

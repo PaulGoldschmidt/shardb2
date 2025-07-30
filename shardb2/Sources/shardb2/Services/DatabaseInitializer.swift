@@ -15,8 +15,7 @@ public final class DatabaseInitializer {
     }
     
     private func performInitialization(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        // Use a much earlier start date to capture all available HealthKit data
-        let startDate = DateComponents(calendar: Calendar.current, year: 2014, month: 9, day: 1).date! // iOS 8 HealthKit launch
+        let startDate = user.firstHealthKitRecord
         let endDate = Date()
         
         // Phase 1: Fetch all HealthKit data (1% to 10% of total progress)

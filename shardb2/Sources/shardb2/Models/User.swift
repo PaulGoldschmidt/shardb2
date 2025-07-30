@@ -15,9 +15,9 @@ public final class User {
     public init(
         userID: UUID = UUID(),
         birthdate: Date,
-        lastProcessedAt: Date = Date(),
+        lastProcessedAt: Date = DateComponents(calendar: Calendar.current, year: 1999, month: 1, day: 1).date!,
         firstInit: Date = Date(),
-        firstHealthKitRecord: Date = Date(),
+        firstHealthKitRecord: Date = DateComponents(calendar: Calendar.current, year: 2014, month: 9, day: 1).date!, // Default to HealthKit launch
         receivesNotifications: Bool = true,
         healthkitAuthorized: Bool = false,
         usesMetric: Bool = true

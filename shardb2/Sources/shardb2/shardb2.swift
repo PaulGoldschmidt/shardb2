@@ -4,6 +4,7 @@ import HealthKit
 
 public final class HealthStatsLibrary {
     private let healthKitManager = HealthKitManager()
+    private let healthDataAggregator = HealthDataAggregator()
     private let modelContext: ModelContext
     private let databaseInitializer: DatabaseInitializer
     private let dataUpdater: DataUpdater
@@ -42,6 +43,12 @@ public final class HealthStatsLibrary {
         try modelContext.save()
     }
     
+    public func setUserFirstHealthKitRecord(_ user: User) throws {
+        let earliestDate = try healthDataAggregator.findEarliestHealthKitSample()
+        user.firstHealthKitRecord = earliestDate
+        try updateUser(user)
+    }
+    
     public func deleteUser(_ user: User) throws {
         modelContext.delete(user)
         try modelContext.save()
@@ -64,10 +71,11 @@ public final class HealthStatsLibrary {
         
         try modelContext.save()
         
-        // Reset user's lastProcessedAt to force full reprocessing
+        // Reset user's lastProcessedAt to force full reprocessing and update firstHealthKitRecord
         let resetDate = DateComponents(calendar: Calendar.current, year: 1999, month: 1, day: 1).date!
         user.lastProcessedAt = resetDate
-        try updateUser(user)
+        // Re-detect the actual first HealthKit record
+        try setUserFirstHealthKitRecord(user)
     }
     
     // HealthKit authorization status
