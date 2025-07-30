@@ -57,15 +57,23 @@ public final class HealthDataAggregator {
                 currentTask: "Fetching \(typeName) data..."
             ))
             
-            let samples = try await fetchSamples(for: quantityType, predicate: predicate)
-            
-            // Enhanced logging for sample details
-            progressCallback(InitializationProgress(
-                percentage: progress + 0.5,
-                currentTask: "Processing \(samples.count) \(typeName) samples..."
-            ))
-            
-            processSamples(samples, into: &dailyData, calendar: calendar)
+            do {
+                let samples = try await fetchSamples(for: quantityType, predicate: predicate)
+                
+                progressCallback(InitializationProgress(
+                    percentage: progress + 0.5,
+                    currentTask: "Processing \(samples.count) \(typeName) samples..."
+                ))
+                
+                processSamples(samples, into: &dailyData, calendar: calendar)
+            } catch {
+                // If fetching fails, the data type will remain at default values (0)
+                // which is already set when initializing dailyData
+                progressCallback(InitializationProgress(
+                    percentage: progress + 0.5,
+                    currentTask: "Skipped \(typeName) (no data available)"
+                ))
+            }
         }
         
         // Fetch sleep analysis data separately as it's a category type
@@ -75,14 +83,22 @@ public final class HealthDataAggregator {
                 currentTask: "Fetching Sleep Analysis data..."
             ))
             
-            let sleepSamples = try await fetchSleepSamples(for: sleepType, predicate: predicate)
-            
-            progressCallback(InitializationProgress(
-                percentage: 8.5,
-                currentTask: "Processing \(sleepSamples.count) Sleep Analysis samples..."
-            ))
-            
-            processSleepSamples(sleepSamples, into: &dailyData, calendar: calendar)
+            do {
+                let sleepSamples = try await fetchSleepSamples(for: sleepType, predicate: predicate)
+                
+                progressCallback(InitializationProgress(
+                    percentage: 8.5,
+                    currentTask: "Processing \(sleepSamples.count) Sleep Analysis samples..."
+                ))
+                
+                processSleepSamples(sleepSamples, into: &dailyData, calendar: calendar)
+            } catch {
+                // If sleep data fetching fails, sleep values remain at default (0)
+                progressCallback(InitializationProgress(
+                    percentage: 8.5,
+                    currentTask: "Skipped Sleep Analysis (no data available)"
+                ))
+            }
         }
         
         // Final logging of processed data
