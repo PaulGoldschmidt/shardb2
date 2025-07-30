@@ -51,7 +51,12 @@ try healthStats.initializeDatabase(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
-// 9. Update missing data incrementally
+// 9. Refresh all data efficiently (recommended for regular updates)
+try healthStats.refreshAllData(for: user) { progress in
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+
+// Alternative: Update missing data incrementally (legacy method)
 try healthStats.updateMissingData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
@@ -67,8 +72,8 @@ print("Personal best steps: \(highscores?.mostStepsInADay ?? 0)")
 print("Longest sleep: \(highscores?.longestSleep ?? 0) minutes")
 print("Sleep streak record: \(highscores?.sleepStreakRecord ?? 0) days")
 
-// 12. Update highscores after new data
-try healthStats.createOrUpdateHighscoreRecord()
+// 12. Highscores are automatically updated during refreshAllData()
+// No manual update needed - use refreshAllData() for efficient updates
 ```
 
 ## Analytics Queries
@@ -202,14 +207,14 @@ try healthStats.clearDatabaseExceptUser(user)
 ### Database Management Functions
 - `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 and re-detects firstHealthKitRecord for full reprocessing
 - `setUserFirstHealthKitRecord(_ user: User) throws` - Queries HealthKit to find the user's earliest sample and sets firstHealthKitRecord accordingly
+- `refreshAllData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - **Recommended**: Efficiently refreshes only new data since last update, updates current period analytics, and incremental highscore checking
 
 ### Highscore Functions
 - `getHighscoreRecord() throws -> HighscoreRecord?` - Retrieves the user's personal records and achievements
-- `createOrUpdateHighscoreRecord() throws -> HighscoreRecord` - Calculates and updates all personal records from existing analytics data
 
 ### Data Models
 
-**User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
+**User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), highscoresLastUpdated (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
 
 **DailyAnalytics**: Comprehensive daily health metrics with strongly typed properties:
 - id (Int) - Auto-incrementing identifier

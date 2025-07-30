@@ -40,8 +40,12 @@ public final class DatabaseInitializer {
         // Phase 5: Create yearly analytics (15% of progress, 75-90%)
         try createYearlyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
-        // Phase 6: Update user (10% of progress, 90-100%)
-        progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Updating user record..."))
+        // Phase 6: Calculate highscores (5% of progress, 90-95%)
+        progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Calculating personal records..."))
+        try calculateHighscores()
+        
+        // Phase 7: Update user (5% of progress, 95-100%)
+        progressCallback(InitializationProgress(percentage: 95.0, currentTask: "Updating user record..."))
         user.lastProcessedAt = Date()
         try modelContext.save()
         
@@ -106,8 +110,8 @@ public final class DatabaseInitializer {
         guard let firstDate = sortedDates.first, let lastDate = sortedDates.last else { return }
         
         var weeklyData: [Date: HealthDataPoint] = [:]
-        var currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: firstDate)?.start ?? firstDate
-        let finalWeekStart = calendar.dateInterval(of: .weekOfYear, for: lastDate)?.start ?? lastDate
+        _ = calendar.dateInterval(of: .weekOfYear, for: firstDate)?.start ?? firstDate
+        _ = calendar.dateInterval(of: .weekOfYear, for: lastDate)?.start ?? lastDate
         
         // Group daily data by weeks
         for date in sortedDates {
@@ -330,5 +334,76 @@ public final class DatabaseInitializer {
         aggregated.sleepREM += new.sleepREM
         
         return aggregated
+    }
+    
+    private func calculateHighscores() throws {
+        // Create a temporary HealthStatsLibrary instance to access highscore methods
+        let healthStatsLibrary = HealthStatsLibrary(modelContext: modelContext)
+        
+        // Get existing highscore record or create new one
+        let existingRecord = try healthStatsLibrary.getHighscoreRecord()
+        let highscoreRecord = existingRecord ?? HighscoreRecord()
+        
+        if existingRecord == nil {
+            modelContext.insert(highscoreRecord)
+        }
+        
+        // Calculate all highscores from existing daily analytics (full calculation during init)
+        let allDailyAnalytics = try healthStatsLibrary.getAllDailyAnalytics()
+        
+        // Process each day to find records
+        for daily in allDailyAnalytics {
+            // Daily activity records
+            if daily.steps > highscoreRecord.mostStepsInADay {
+                highscoreRecord.mostStepsInADay = daily.steps
+                highscoreRecord.mostStepsInADayDate = daily.date
+            }
+            
+            let totalCalories = daily.energyActive + daily.energyResting
+            if totalCalories > highscoreRecord.mostCaloriesInADay {
+                highscoreRecord.mostCaloriesInADay = totalCalories
+                highscoreRecord.mostCaloriesInADayDate = daily.date
+            }
+            
+            if daily.exerciseMinutes > highscoreRecord.mostExerciseMinutesInADay {
+                highscoreRecord.mostExerciseMinutesInADay = daily.exerciseMinutes
+                highscoreRecord.mostExerciseMinutesInADayDate = daily.date
+            }
+            
+            // Distance records
+            if daily.walkingDistance > highscoreRecord.longestWalk {
+                highscoreRecord.longestWalk = daily.walkingDistance
+                highscoreRecord.longestWalkDate = daily.date
+            }
+            
+            if daily.cyclingDistance > highscoreRecord.longestBikeRide {
+                highscoreRecord.longestBikeRide = daily.cyclingDistance
+                highscoreRecord.longestBikeRideDate = daily.date
+            }
+            
+            if daily.swimmingDistance > highscoreRecord.longestSwim {
+                highscoreRecord.longestSwim = daily.swimmingDistance
+                highscoreRecord.longestSwimDate = daily.date
+            }
+            
+            // Sleep records
+            if daily.sleepTotal > highscoreRecord.longestSleep {
+                highscoreRecord.longestSleep = daily.sleepTotal
+                highscoreRecord.longestSleepDate = daily.date
+            }
+            
+            if daily.sleepDeep > highscoreRecord.mostDeepSleep {
+                highscoreRecord.mostDeepSleep = daily.sleepDeep
+                highscoreRecord.mostDeepSleepDate = daily.date
+            }
+            
+            if daily.sleepREM > highscoreRecord.mostREMSleep {
+                highscoreRecord.mostREMSleep = daily.sleepREM
+                highscoreRecord.mostREMSleepDate = daily.date
+            }
+        }
+        
+        highscoreRecord.lastUpdated = Date()
+        try modelContext.save()
     }
 }

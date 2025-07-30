@@ -140,7 +140,7 @@ public final class DataUpdater {
     }
     
     private func updateWeeklyAnalytics(for startDate: Date, to endDate: Date, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        let calendar = Calendar.current
+        _ = Calendar.current
         
         // Get all weeks that need updating
         let weeksToUpdate = getWeekRanges(from: startDate, to: endDate)
