@@ -19,7 +19,7 @@ import HealthKit
 import shardb2
 
 // 1. Setup SwiftData with all models
-let container = try ModelContainer(for: User.self, DailyAnalytics.self, WeeklyAnalytics.self, MonthlyAnalytics.self, YearlyAnalytics.self)
+let container = try ModelContainer(for: User.self, DailyAnalytics.self, WeeklyAnalytics.self, MonthlyAnalytics.self, YearlyAnalytics.self, HighscoreRecord.self)
 let context = ModelContext(container)
 
 // 2. Initialize library
@@ -60,6 +60,15 @@ try healthStats.updateMissingData(for: user) { progress in
 let todaySteps = try healthStats.getDailyAnalytics(for: Date())?.steps ?? 0
 let allUsers = try healthStats.getAllUsers()
 print("Steps today: \(todaySteps)")
+
+// 11. Get personal records and achievements
+let highscores = try healthStats.getHighscoreRecord()
+print("Personal best steps: \(highscores?.mostStepsInADay ?? 0)")
+print("Longest sleep: \(highscores?.longestSleep ?? 0) minutes")
+print("Sleep streak record: \(highscores?.sleepStreakRecord ?? 0) days")
+
+// 12. Update highscores after new data
+try healthStats.createOrUpdateHighscoreRecord()
 ```
 
 ## Analytics Queries
@@ -194,6 +203,10 @@ try healthStats.clearDatabaseExceptUser(user)
 - `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 and re-detects firstHealthKitRecord for full reprocessing
 - `setUserFirstHealthKitRecord(_ user: User) throws` - Queries HealthKit to find the user's earliest sample and sets firstHealthKitRecord accordingly
 
+### Highscore Functions
+- `getHighscoreRecord() throws -> HighscoreRecord?` - Retrieves the user's personal records and achievements
+- `createOrUpdateHighscoreRecord() throws -> HighscoreRecord` - Calculates and updates all personal records from existing analytics data
+
 ### Data Models
 
 **User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
@@ -242,6 +255,27 @@ try healthStats.clearDatabaseExceptUser(user)
 - startDate (Date) - Start of the year (January 1st)
 - endDate (Date) - End of the year (December 31st)
 - All the same health metrics as DailyAnalytics
+- recordedAt (Date) - When this record was created
+
+**HighscoreRecord**: Personal records and achievements:
+- id (Int, unique) - Record identifier (usually 1 per user)
+- peakHeartRate (Double) + date - Highest recorded heart rate in BPM
+- peakRunningSpeed (Double) + date - Fastest running speed in m/s
+- peakRunningPower (Double) + date - Highest running power in Watts
+- longestRun (Double) + date - Longest running distance in meters
+- longestBikeRide (Double) + date - Longest cycling distance in meters
+- longestSwim (Double) + date - Longest swimming distance in meters
+- longestWalk (Double) + date - Longest walking distance in meters
+- longestWorkout (Int) + date - Longest workout duration in minutes
+- mostStepsInADay (Int) + date - Highest daily step count
+- mostCaloriesInADay (Double) + date - Highest daily calorie burn (active + resting)
+- mostExerciseMinutesInADay (Int) + date - Most exercise minutes in a single day
+- longestSleep (Int) + date - Longest sleep duration in minutes
+- mostDeepSleep (Int) + date - Most deep sleep in minutes
+- mostREMSleep (Int) + date - Most REM sleep in minutes
+- sleepStreakRecord (Int) + start/end dates - Longest consecutive days with sleep data
+- workoutStreakRecord (Int) + start/end dates - Longest consecutive days with workouts
+- lastUpdated (Date) - When records were last calculated
 - recordedAt (Date) - When this record was created
 
 **InitializationProgress**: Progress tracking for database initialization:
