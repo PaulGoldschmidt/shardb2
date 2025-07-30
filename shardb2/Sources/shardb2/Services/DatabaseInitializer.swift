@@ -10,18 +10,18 @@ public final class DatabaseInitializer {
         self.modelContext = modelContext
     }
     
-    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        try performInitialization(for: user, progressCallback: progressCallback)
+    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        try await performInitialization(for: user, progressCallback: progressCallback)
     }
     
-    private func performInitialization(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+    private func performInitialization(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         let startDate = user.firstHealthKitRecord
         let endDate = Date()
         
         // Phase 1: Fetch all HealthKit data (1% to 10% of total progress)
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting database initialization..."))
         
-        let dailyHealthData = try healthDataAggregator.fetchAllHealthData(from: startDate, to: endDate) { progress in
+        let dailyHealthData = try await healthDataAggregator.fetchAllHealthData(from: startDate, to: endDate) { progress in
             progressCallback(progress)
         }
         let totalDays = dailyHealthData.count

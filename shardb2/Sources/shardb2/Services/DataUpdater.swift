@@ -10,11 +10,11 @@ public final class DataUpdater {
         self.modelContext = modelContext
     }
     
-    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        try performDataUpdate(for: user, progressCallback: progressCallback)
+    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        try await performDataUpdate(for: user, progressCallback: progressCallback)
     }
     
-    private func performDataUpdate(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+    private func performDataUpdate(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         let calendar = Calendar.current
         let now = Date()
         
@@ -30,7 +30,7 @@ public final class DataUpdater {
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting incremental data update..."))
         
         // Phase 1: Fetch missing HealthKit data (0-15%)
-        let dailyHealthData = try healthDataAggregator.fetchAllHealthData(from: startDate, to: now) { progress in
+        let dailyHealthData = try await healthDataAggregator.fetchAllHealthData(from: startDate, to: now) { progress in
             let adjustedProgress = InitializationProgress(
                 percentage: progress.percentage * 0.15, // Scale to 15%
                 currentTask: progress.currentTask

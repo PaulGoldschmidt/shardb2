@@ -43,8 +43,8 @@ public final class HealthStatsLibrary {
         try modelContext.save()
     }
     
-    public func setUserFirstHealthKitRecord(_ user: User) throws {
-        let earliestDate = try healthDataAggregator.findEarliestHealthKitSample()
+    public func setUserFirstHealthKitRecord(_ user: User) async throws {
+        let earliestDate = try await healthDataAggregator.findEarliestHealthKitSample()
         user.firstHealthKitRecord = earliestDate
         try updateUser(user)
     }
@@ -56,7 +56,7 @@ public final class HealthStatsLibrary {
     
     // MARK: - Database Management
     
-    public func clearDatabaseExceptUser(_ user: User) throws {
+    public func clearDatabaseExceptUser(_ user: User) async throws {
         // Clear all analytics but keep user data
         let dailyAnalytics = try getAllDailyAnalytics()
         let weeklyAnalytics = try getAllWeeklyAnalytics()
@@ -75,7 +75,7 @@ public final class HealthStatsLibrary {
         let resetDate = DateComponents(calendar: Calendar.current, year: 1999, month: 1, day: 1).date!
         user.lastProcessedAt = resetDate
         // Re-detect the actual first HealthKit record
-        try setUserFirstHealthKitRecord(user)
+        try await setUserFirstHealthKitRecord(user)
     }
     
     // HealthKit authorization status
@@ -85,13 +85,13 @@ public final class HealthStatsLibrary {
     
     
     // Database initialization with progress callback
-    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        try databaseInitializer.initializeDatabase(for: user, progressCallback: progressCallback)
+    public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        try await databaseInitializer.initializeDatabase(for: user, progressCallback: progressCallback)
     }
     
     // Incremental data updates with progress callback
-    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
-        try dataUpdater.updateMissingData(for: user, progressCallback: progressCallback)
+    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        try await dataUpdater.updateMissingData(for: user, progressCallback: progressCallback)
     }
     
     // MARK: - Daily Analytics Queries
@@ -268,7 +268,7 @@ public final class HealthStatsLibrary {
     
     // MARK: - Comprehensive Data Refresh
     
-    public func refreshAllData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws {
+    public func refreshAllData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         let now = Date()
         let lastRefresh = user.lastProcessedAt
         let lastHighscoreUpdate = user.highscoresLastUpdated
@@ -276,7 +276,7 @@ public final class HealthStatsLibrary {
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting data refresh..."))
         
         // Phase 1: Update missing HealthKit data (0-30%)
-        try dataUpdater.updateMissingData(for: user) { progress in
+        try await dataUpdater.updateMissingData(for: user) { progress in
             let adjustedProgress = InitializationProgress(
                 percentage: progress.percentage * 0.3, // Scale to 30%
                 currentTask: progress.currentTask
