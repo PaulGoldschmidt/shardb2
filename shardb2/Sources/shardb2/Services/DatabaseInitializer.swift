@@ -251,6 +251,8 @@ public final class DatabaseInitializer {
     }
     
     private func createYearlyAnalytics(from dailyData: [Date: HealthDataPoint], progressCallback: @escaping (InitializationProgress) -> Void) throws {
+        let calendar = Calendar.current
+        
         // Get all monthly analytics from the database (already stored)
         let allMonthlyAnalytics = try getAllMonthlyAnalyticsFromDB()
         
