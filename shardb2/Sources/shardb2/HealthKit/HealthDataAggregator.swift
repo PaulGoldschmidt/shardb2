@@ -237,36 +237,71 @@ public final class HealthDataAggregator {
     }
     
     private func processSleepSamples(_ samples: [HKCategorySample], into dailyData: inout [Date: HealthDataPoint], calendar: Calendar) {
+        // Group samples by day and source to avoid double-counting
+        var samplesByDay: [Date: [String: [HKCategorySample]]] = [:]
+        
         for sample in samples {
             let day = calendar.startOfDay(for: sample.startDate)
+            let sourceId = sample.sourceRevision.source.bundleIdentifier
+            
+            if samplesByDay[day] == nil {
+                samplesByDay[day] = [:]
+            }
+            if samplesByDay[day]![sourceId] == nil {
+                samplesByDay[day]![sourceId] = []
+            }
+            samplesByDay[day]![sourceId]!.append(sample)
+        }
+        
+        // Process each day, using only the highest priority source
+        for (day, sourceDict) in samplesByDay {
+            let prioritizedSourceId = selectPrioritySource(from: Array(sourceDict.keys))
+            let prioritizedSamples = sourceDict[prioritizedSourceId] ?? []
             
             var dataPoint = dailyData[day] ?? HealthDataPoint()
             
-            // Calculate sleep duration in minutes
-            let sleepDuration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0
-            let sleepMinutes = Int(sleepDuration)
-            
-            // Process different sleep stages
-            switch sample.value {
-            case HKCategoryValueSleepAnalysis.inBed.rawValue,
-                 HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
-                dataPoint.sleepTotal += sleepMinutes
-            case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
-                dataPoint.sleepTotal += sleepMinutes
-                // Core sleep can be considered as regular sleep
-            case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
-                dataPoint.sleepTotal += sleepMinutes
-                dataPoint.sleepDeep += sleepMinutes
-            case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
-                dataPoint.sleepTotal += sleepMinutes
-                dataPoint.sleepREM += sleepMinutes
-            default:
-                // Handle other sleep states if needed
-                break
+            // Process only samples from the prioritized source
+            for sample in prioritizedSamples {
+                let sleepDuration = sample.endDate.timeIntervalSince(sample.startDate) / 60.0
+                let sleepMinutes = Int(sleepDuration)
+                
+                switch sample.value {
+                case HKCategoryValueSleepAnalysis.inBed.rawValue,
+                     HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+                    dataPoint.sleepTotal += sleepMinutes
+                case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                    dataPoint.sleepTotal += sleepMinutes
+                case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                    dataPoint.sleepTotal += sleepMinutes
+                    dataPoint.sleepDeep += sleepMinutes
+                case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                    dataPoint.sleepTotal += sleepMinutes
+                    dataPoint.sleepREM += sleepMinutes
+                default:
+                    break
+                }
             }
             
             dailyData[day] = dataPoint
         }
+    }
+    
+    private func selectPrioritySource(from sourceIds: [String]) -> String {
+        // Priority order: Apple Watch > iPhone > Third-party apps
+        let priorities = [
+            "com.apple.health.8A0DD10F-5ABF-4314-AD7E-C77CF88BA901", // Apple Watch
+            "com.apple.Health",                                       // iPhone Health app
+            "com.apple.health"                                        // iPhone Health app (alternative)
+        ]
+        
+        for priority in priorities {
+            if sourceIds.contains(priority) {
+                return priority
+            }
+        }
+        
+        // If no known sources, return the first one (alphabetically for consistency)
+        return sourceIds.sorted().first ?? sourceIds.first ?? ""
     }
 }
 
