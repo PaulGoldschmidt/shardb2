@@ -10,7 +10,33 @@ public final class DataUpdater {
         self.modelContext = modelContext
     }
     
-    public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+    public func updateMissingData(for user: User, healthKitManager: HealthKitManager, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        // Check HealthKit authorization first
+        let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
+        
+        if authStatus != .sharingAuthorized {
+            // Update user model to reflect unauthorized status
+            user.healthkitAuthorized = false
+            try modelContext.save()
+            
+            // Provide user feedback about authorization status
+            let statusMessage: String
+            switch authStatus {
+            case .notDetermined:
+                statusMessage = "HealthKit authorization not determined - please authorize HealthKit access"
+            case .sharingDenied:
+                statusMessage = "HealthKit access denied - please enable in Settings"
+            default:
+                statusMessage = "HealthKit access not authorized - please check permissions"
+            }
+            
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: statusMessage))
+            return
+        }
+        
+        // Authorization confirmed - proceed with update
+        user.healthkitAuthorized = true
+        try modelContext.save()
         try await performDataUpdate(for: user, progressCallback: progressCallback)
     }
     

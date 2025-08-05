@@ -91,7 +91,7 @@ public final class HealthStatsLibrary {
     
     // Incremental data updates with progress callback
     public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
-        try await dataUpdater.updateMissingData(for: user, progressCallback: progressCallback)
+        try await dataUpdater.updateMissingData(for: user, healthKitManager: healthKitManager, progressCallback: progressCallback)
     }
     
     // MARK: - Daily Analytics Queries
@@ -276,7 +276,7 @@ public final class HealthStatsLibrary {
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting data refresh..."))
         
         // Phase 1: Update missing HealthKit data (0-30%)
-        try await dataUpdater.updateMissingData(for: user) { progress in
+        try await dataUpdater.updateMissingData(for: user, healthKitManager: healthKitManager) { progress in
             let adjustedProgress = InitializationProgress(
                 percentage: progress.percentage * 0.3, // Scale to 30%
                 currentTask: progress.currentTask
