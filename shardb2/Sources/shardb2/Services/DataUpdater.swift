@@ -11,14 +11,20 @@ public final class DataUpdater {
     }
     
     public func updateMissingData(for user: User, healthKitManager: HealthKitManager, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
-        // Check HealthKit authorization first
+        // Check HealthKit authorization first and always update user model
         let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
+        let isAuthorized = authStatus == .sharingAuthorized
         
-        if authStatus != .sharingAuthorized {
-            // Update user model to reflect unauthorized status
-            user.healthkitAuthorized = false
+        // Always update the user model to reflect current authorization status
+        let previousAuthStatus = user.healthkitAuthorized
+        user.healthkitAuthorized = isAuthorized
+        
+        // Save if status changed
+        if previousAuthStatus != isAuthorized {
             try modelContext.save()
-            
+        }
+        
+        if !isAuthorized {
             // Provide user feedback about authorization status
             let statusMessage: String
             switch authStatus {
@@ -35,8 +41,6 @@ public final class DataUpdater {
         }
         
         // Authorization confirmed - proceed with update
-        user.healthkitAuthorized = true
-        try modelContext.save()
         try await performDataUpdate(for: user, progressCallback: progressCallback)
     }
     
@@ -46,7 +50,7 @@ public final class DataUpdater {
         
         // Calculate date range - start from lastProcessedAt day (to overwrite)
         let startDate = calendar.startOfDay(for: user.lastProcessedAt)
-        let endDate = calendar.startOfDay(for: now)
+        let endDate = now // Use current time to include current day data
         
         guard startDate <= endDate else {
             progressCallback(InitializationProgress(percentage: 100.0, currentTask: "No missing data to process"))

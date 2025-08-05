@@ -83,6 +83,22 @@ public final class HealthStatsLibrary {
         return healthKitManager.getAuthorizationStatus(for: type)
     }
     
+    // Update user model with current HealthKit authorization status
+    public func updateUserHealthKitAuthorizationStatus(for user: User) throws -> Bool {
+        let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
+        let isAuthorized = authStatus == .sharingAuthorized
+        let previousAuthStatus = user.healthkitAuthorized
+        
+        user.healthkitAuthorized = isAuthorized
+        
+        // Save if status changed
+        if previousAuthStatus != isAuthorized {
+            try modelContext.save()
+        }
+        
+        return isAuthorized
+    }
+    
     
     // Database initialization with progress callback
     public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
