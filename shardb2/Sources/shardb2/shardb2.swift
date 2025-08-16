@@ -110,6 +110,11 @@ public final class HealthStatsLibrary {
         try await dataUpdater.updateMissingData(for: user, healthKitManager: healthKitManager, progressCallback: progressCallback)
     }
     
+    // Refresh current day data specifically to get latest HealthKit updates
+    public func refreshCurrentDay(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        try await dataUpdater.refreshCurrentDay(for: user, healthKitManager: healthKitManager, progressCallback: progressCallback)
+    }
+    
     // MARK: - Daily Analytics Queries
     
     public func getDailyAnalytics(for date: Date) throws -> DailyAnalytics? {
@@ -888,7 +893,8 @@ public final class HealthStatsLibrary {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
     }
     
@@ -915,7 +921,8 @@ public final class HealthStatsLibrary {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
     }
     
@@ -941,7 +948,8 @@ public final class HealthStatsLibrary {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
     }
 }

@@ -79,7 +79,8 @@ public final class DatabaseInitializer {
                 standMinutes: dataPoint.standMinutes,
                 sleepTotal: dataPoint.sleepTotal,
                 sleepDeep: dataPoint.sleepDeep,
-                sleepREM: dataPoint.sleepREM
+                sleepREM: dataPoint.sleepREM,
+                recordedAt: Date()
             )
             
             modelContext.insert(dailyAnalytics)
@@ -154,7 +155,8 @@ public final class DatabaseInitializer {
                 standMinutes: dataPoint.standMinutes,
                 sleepTotal: dataPoint.sleepTotal,
                 sleepDeep: dataPoint.sleepDeep,
-                sleepREM: dataPoint.sleepREM
+                sleepREM: dataPoint.sleepREM,
+                recordedAt: Date()
             )
             
             modelContext.insert(weeklyAnalytics)
@@ -232,7 +234,8 @@ public final class DatabaseInitializer {
                 standMinutes: dataPoint.standMinutes,
                 sleepTotal: dataPoint.sleepTotal,
                 sleepDeep: dataPoint.sleepDeep,
-                sleepREM: dataPoint.sleepREM
+                sleepREM: dataPoint.sleepREM,
+                recordedAt: Date()
             )
             
             modelContext.insert(monthlyAnalytics)

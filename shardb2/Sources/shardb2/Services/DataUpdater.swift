@@ -144,7 +144,8 @@ public final class DataUpdater {
                     standMinutes: dataPoint.standMinutes,
                     sleepTotal: dataPoint.sleepTotal,
                     sleepDeep: dataPoint.sleepDeep,
-                    sleepREM: dataPoint.sleepREM
+                    sleepREM: dataPoint.sleepREM,
+                    recordedAt: Date()
                 )
                 modelContext.insert(dailyAnalytics)
                 currentID += 1
@@ -599,7 +600,8 @@ public final class DataUpdater {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
     }
     
@@ -626,7 +628,8 @@ public final class DataUpdater {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
     }
     
@@ -652,7 +655,100 @@ public final class DataUpdater {
             standMinutes: data.standMinutes,
             sleepTotal: data.sleepTotal,
             sleepDeep: data.sleepDeep,
-            sleepREM: data.sleepREM
+            sleepREM: data.sleepREM,
+            recordedAt: Date()
         )
+    }
+    
+    // Refresh current day data specifically to get latest HealthKit updates
+    public func refreshCurrentDay(for user: User, healthKitManager: HealthKitManager, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
+        // Check HealthKit authorization first
+        let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
+        let isAuthorized = authStatus == .sharingAuthorized
+        
+        // Update authorization status
+        let previousAuthStatus = user.healthkitAuthorized
+        user.healthkitAuthorized = isAuthorized
+        
+        if previousAuthStatus != isAuthorized {
+            try modelContext.save()
+        }
+        
+        if !isAuthorized {
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: "HealthKit access not authorized"))
+            return
+        }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        let todayStart = calendar.startOfDay(for: now)
+        
+        progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Refreshing current day data..."))
+        
+        // Fetch today's HealthKit data
+        let dailyHealthData = try await healthDataAggregator.fetchAllHealthData(from: todayStart, to: now) { progress in
+            let adjustedProgress = InitializationProgress(
+                percentage: progress.percentage * 0.8, // Scale to 80%
+                currentTask: progress.currentTask
+            )
+            progressCallback(adjustedProgress)
+        }
+        
+        progressCallback(InitializationProgress(percentage: 80.0, currentTask: "Updating current day analytics..."))
+        
+        // Update only today's daily analytics
+        if let todayData = dailyHealthData[todayStart] {
+            if let existingRecord = try getDailyAnalyticsForDate(todayStart) {
+                // Update existing record with fresh data
+                existingRecord.steps = todayData.steps
+                existingRecord.cyclingDistance = todayData.cyclingDistance
+                existingRecord.walkingDistance = todayData.walkingDistance
+                existingRecord.runningDistance = todayData.runningDistance
+                existingRecord.swimmingDistance = todayData.swimmingDistance
+                existingRecord.swimmingStrokes = todayData.swimmingStrokes
+                existingRecord.crossCountrySkiingDistance = todayData.crossCountrySkiingDistance
+                existingRecord.downhillSnowSportsDistance = todayData.downhillSnowSportsDistance
+                existingRecord.energyActive = todayData.energyActive
+                existingRecord.energyResting = todayData.energyResting
+                existingRecord.heartbeats = todayData.heartbeats
+                existingRecord.stairsClimbed = todayData.stairsClimbed
+                existingRecord.exerciseMinutes = todayData.exerciseMinutes
+                existingRecord.standMinutes = todayData.standMinutes
+                existingRecord.sleepTotal = todayData.sleepTotal
+                existingRecord.sleepDeep = todayData.sleepDeep
+                existingRecord.sleepREM = todayData.sleepREM
+                existingRecord.recordedAt = Date()
+            } else {
+                // Create new record for today
+                let highestID = try getHighestDailyAnalyticsID()
+                let dailyAnalytics = DailyAnalytics(
+                    id: highestID + 1,
+                    date: todayStart,
+                    steps: todayData.steps,
+                    cyclingDistance: todayData.cyclingDistance,
+                    walkingDistance: todayData.walkingDistance,
+                    runningDistance: todayData.runningDistance,
+                    swimmingDistance: todayData.swimmingDistance,
+                    swimmingStrokes: todayData.swimmingStrokes,
+                    crossCountrySkiingDistance: todayData.crossCountrySkiingDistance,
+                    downhillSnowSportsDistance: todayData.downhillSnowSportsDistance,
+                    energyActive: todayData.energyActive,
+                    energyResting: todayData.energyResting,
+                    heartbeats: todayData.heartbeats,
+                    stairsClimbed: todayData.stairsClimbed,
+                    exerciseMinutes: todayData.exerciseMinutes,
+                    standMinutes: todayData.standMinutes,
+                    sleepTotal: todayData.sleepTotal,
+                    sleepDeep: todayData.sleepDeep,
+                    sleepREM: todayData.sleepREM,
+                    recordedAt: Date()
+                )
+                modelContext.insert(dailyAnalytics)
+            }
+            
+            try modelContext.save()
+        }
+        
+        progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Current day refresh completed!"))
     }
 }
