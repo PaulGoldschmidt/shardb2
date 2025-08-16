@@ -697,7 +697,12 @@ public final class DataUpdater {
         progressCallback(InitializationProgress(percentage: 80.0, currentTask: "Updating current day analytics..."))
         
         // Update only today's daily analytics
-        if let todayData = dailyHealthData[todayStart] {
+        guard let todayData = dailyHealthData[todayStart] else {
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: "No current day data available - completed with empty data"))
+            return
+        }
+        
+        do {
             if let existingRecord = try getDailyAnalyticsForDate(todayStart) {
                 // Update existing record with fresh data
                 existingRecord.steps = todayData.steps
@@ -718,6 +723,8 @@ public final class DataUpdater {
                 existingRecord.sleepDeep = todayData.sleepDeep
                 existingRecord.sleepREM = todayData.sleepREM
                 existingRecord.recordedAt = Date()
+                
+                progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Saving updated current day record..."))
             } else {
                 // Create new record for today
                 let highestID = try getHighestDailyAnalyticsID()
@@ -744,11 +751,18 @@ public final class DataUpdater {
                     recordedAt: Date()
                 )
                 modelContext.insert(dailyAnalytics)
+                
+                progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Saving new current day record..."))
             }
             
+            // Save database changes
             try modelContext.save()
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Current day refresh completed successfully!"))
+            
+        } catch {
+            // Database operation failed - provide specific error feedback
+            progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Current day refresh failed: \(error.localizedDescription)"))
+            throw error
         }
-        
-        progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Current day refresh completed!"))
     }
 }
