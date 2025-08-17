@@ -3,7 +3,7 @@
 > [!WARNING]
 > shardb2 is experimental and in active development. Some information on this page might be out of date with latest development.
 
-A Swift Package Manager library for comprehensive health statistics tracking and analytics. Integrates with HealthKit to collect health data and uses SwiftData for modern, reliable persistence. Designed for iOS health apps (e.g. "YourStats") that need robust step tracking, sleep analysis, exercise monitoring, and personal record tracking.
+A Swift library (pronounced 'shard-b2') for comprehensive health statistics tracking and analytics. Integrates with HealthKit to collect health data and uses SwiftData for modern, reliable persistence. Designed for iOS health apps (e.g. "YourStats") that need robust step tracking, sleep analysis, exercise monitoring, and personal record tracking.
 This lib is a playground to explore optimization potentials in data-store using the SwiftData framework and can be seen as a blueprint for all sorts of data-intensive, multilevel time-series Apps.
 
 ## Features
