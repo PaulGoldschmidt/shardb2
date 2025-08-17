@@ -2,7 +2,10 @@ import Foundation
 import SwiftData
 import HealthKit
 
+/// Main interface for health statistics tracking and analytics
+/// Combines HealthKit data fetching with SwiftData persistence
 public final class HealthStatsLibrary {
+    // Core managers for different aspects of health data handling
     private let healthKitManager = HealthKitManager()
     private let healthDataAggregator = HealthDataAggregator()
     private let modelContext: ModelContext
@@ -16,7 +19,8 @@ public final class HealthStatsLibrary {
     }
     
     
-    // User management methods
+    // MARK: - User Management
+    // Basic CRUD operations for user data
     public func createUser(birthdate: Date, usesMetric: Bool = true) throws -> User {
         let user = User(birthdate: birthdate, usesMetric: usesMetric)
         modelContext.insert(user)
@@ -43,6 +47,8 @@ public final class HealthStatsLibrary {
         try modelContext.save()
     }
     
+    /// Finds the user's earliest HealthKit sample and updates their record
+    /// This is important for knowing how far back we can process data
     public func setUserFirstHealthKitRecord(_ user: User) async throws {
         let earliestDate = try await healthDataAggregator.findEarliestHealthKitSample()
         user.firstHealthKitRecord = earliestDate
@@ -55,7 +61,10 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Database Management
+    // Heavy lifting operations for data processing
     
+    /// Nuclear option - wipes all analytics but keeps user data
+    /// Useful for debugging or when something goes wrong with data processing
     public func clearDatabaseExceptUser(_ user: User) async throws {
         // Clear all analytics but keep user data
         let dailyAnalytics = try getAllDailyAnalytics()
@@ -74,16 +83,18 @@ public final class HealthStatsLibrary {
         // Reset user's lastProcessedAt to force full reprocessing and update firstHealthKitRecord
         let resetDate = DateComponents(calendar: Calendar.current, year: 1999, month: 1, day: 1).date!
         user.lastProcessedAt = resetDate
-        // Re-detect the actual first HealthKit record
+        // Re-detect the actual first HealthKit record so we know our data boundaries
         try await setUserFirstHealthKitRecord(user)
     }
     
-    // HealthKit authorization status
+    // MARK: - HealthKit Authorization
+    // Simple status checks for HealthKit permissions
     public func getHealthKitAuthorizationStatus(for type: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus {
         return healthKitManager.getAuthorizationStatus(for: type)
     }
     
-    // Update user model with current HealthKit authorization status
+    /// Checks current HealthKit status and updates user model if it changed
+    /// Returns the current authorization state
     public func updateUserHealthKitAuthorizationStatus(for user: User) throws -> Bool {
         let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
         let isAuthorized = authStatus == .sharingAuthorized
@@ -91,7 +102,7 @@ public final class HealthStatsLibrary {
         
         user.healthkitAuthorized = isAuthorized
         
-        // Save if status changed
+        // Only hit the database if something actually changed
         if previousAuthStatus != isAuthorized {
             try modelContext.save()
         }
@@ -100,26 +111,30 @@ public final class HealthStatsLibrary {
     }
     
     
-    // Database initialization with progress callback
+    /// Full database initialization - this is the big one that processes everything
+    /// Use this for first-time setup or complete rebuilds
     public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         try await databaseInitializer.initializeDatabase(for: user, progressCallback: progressCallback)
     }
     
-    // Incremental data updates with progress callback
+    /// Incremental updates based on user's last processed timestamp
+    /// More efficient than full initialization for regular updates
     public func updateMissingData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         try await dataUpdater.updateMissingData(for: user, healthKitManager: healthKitManager, progressCallback: progressCallback)
     }
     
-    // Refresh current day data specifically to get latest HealthKit updates
+    /// Quick refresh of just today's data - useful for real-time updates
+    /// Much faster than full refresh when you just need current day
     public func refreshCurrentDay(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         try await dataUpdater.refreshCurrentDay(for: user, healthKitManager: healthKitManager, progressCallback: progressCallback)
     }
     
     // MARK: - Daily Analytics Queries
+    // All the ways to slice and dice daily health data
     
     public func getDailyAnalytics(for date: Date) throws -> DailyAnalytics? {
         let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: date)
+        let startOfDay = calendar.startOfDay(for: date) // Normalize to beginning of day
         
         var descriptor = FetchDescriptor<DailyAnalytics>(
             predicate: #Predicate { $0.date == startOfDay }
@@ -158,10 +173,11 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Weekly Analytics Queries
+    // Week-based aggregations - useful for trends
     
     public func getWeeklyAnalytics(for date: Date) throws -> WeeklyAnalytics? {
         let calendar = Calendar.current
-        guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: date) else { return nil }
+        guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: date) else { return nil } // Handle edge cases
         
         let descriptor = FetchDescriptor<WeeklyAnalytics>(
             predicate: #Predicate { analytics in
@@ -197,6 +213,7 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Monthly Analytics Queries
+    // Monthly views - good for longer-term patterns
     
     public func getMonthlyAnalytics(for date: Date) throws -> MonthlyAnalytics? {
         let calendar = Calendar.current
@@ -248,6 +265,7 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Yearly Analytics Queries
+    // The big picture view of health data
     
     public func getYearlyAnalytics(for date: Date) throws -> YearlyAnalytics? {
         let calendar = Calendar.current
@@ -288,6 +306,7 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Comprehensive Data Refresh
+    // The smart refresh that only updates what's needed
     
     public func refreshAllData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         let now = Date()
@@ -296,7 +315,7 @@ public final class HealthStatsLibrary {
         
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting data refresh..."))
         
-        // Phase 1: Update missing HealthKit data (0-30%)
+        // Phase 1: Get any new HealthKit data we haven't processed yet (0-30%)
         try await dataUpdater.updateMissingData(for: user, healthKitManager: healthKitManager) { progress in
             let adjustedProgress = InitializationProgress(
                 percentage: progress.percentage * 0.3, // Scale to 30%
@@ -306,13 +325,14 @@ public final class HealthStatsLibrary {
         }
         
         // Phase 2: Update current week analytics (30-50%)
+        // We need to refresh current periods since they're still changing
         progressCallback(InitializationProgress(percentage: 30.0, currentTask: "Refreshing current week..."))
         try refreshCurrentPeriodAnalytics(from: lastRefresh, to: now, progressCallback: { progress in
             let adjustedProgress = 30.0 + (progress * 20.0) // 30-50%
             progressCallback(InitializationProgress(percentage: adjustedProgress, currentTask: "Refreshing current period analytics..."))
         })
         
-        // Phase 3: Update highscores with only new data (50-80%)
+        // Phase 3: Check if any new personal records were set (50-80%)
         progressCallback(InitializationProgress(percentage: 50.0, currentTask: "Updating personal records..."))
         try refreshHighscoresIncremental(from: lastHighscoreUpdate, to: now, progressCallback: { progress in
             let adjustedProgress = 50.0 + (progress * 30.0) // 50-80%
@@ -329,6 +349,7 @@ public final class HealthStatsLibrary {
     }
     
     // MARK: - Highscore Management
+    // Personal records and achievements tracking
     
     public func getHighscoreRecord() throws -> HighscoreRecord? {
         var descriptor = FetchDescriptor<HighscoreRecord>()
@@ -337,13 +358,15 @@ public final class HealthStatsLibrary {
     }
     
     
+    /// Scans through all daily data to find personal bests
+    /// This is expensive but thorough - only run when needed
     private func updateHighscoresFromDailyAnalytics(_ highscore: HighscoreRecord) throws {
         // Get all daily analytics to analyze
         let allDailyAnalytics = try getAllDailyAnalytics()
         
         // Process each day to find records
         for daily in allDailyAnalytics {
-            // Daily activity records
+            // Check daily activity records against current bests
             if daily.steps > highscore.mostStepsInADay {
                 highscore.mostStepsInADay = daily.steps
                 highscore.mostStepsInADayDate = daily.date
@@ -360,7 +383,7 @@ public final class HealthStatsLibrary {
                 highscore.mostExerciseMinutesInADayDate = daily.date
             }
             
-            // Distance records (treating as potential longest single activities)
+            // Distance records - these might be cumulative daily totals, not single activities
             if daily.walkingDistance > highscore.longestWalk {
                 highscore.longestWalk = daily.walkingDistance
                 highscore.longestWalkDate = daily.date
@@ -376,7 +399,7 @@ public final class HealthStatsLibrary {
                 highscore.longestSwimDate = daily.date
             }
             
-            // Sleep records
+            // Check sleep records
             if daily.sleepTotal > highscore.longestSleep {
                 highscore.longestSleep = daily.sleepTotal
                 highscore.longestSleepDate = daily.date
@@ -393,11 +416,13 @@ public final class HealthStatsLibrary {
             }
         }
         
-        // Calculate streaks
+        // Calculate streaks - these are tricky since they depend on consecutive days
         try calculateSleepStreak(highscore, from: allDailyAnalytics)
         try calculateWorkoutStreak(highscore, from: allDailyAnalytics)
     }
     
+    /// Finds the longest consecutive streak of days with sleep data
+    /// Uses a simple state machine approach
     private func calculateSleepStreak(_ highscore: HighscoreRecord, from dailyAnalytics: [DailyAnalytics]) throws {
         let sortedDays = dailyAnalytics.sorted { $0.date < $1.date }
         
@@ -408,7 +433,7 @@ public final class HealthStatsLibrary {
         var currentStreakStart: Date?
         
         for daily in sortedDays {
-            if daily.sleepTotal > 0 { // Has sleep data
+            if daily.sleepTotal > 0 { // Any sleep is better than no sleep
                 if currentStreak == 0 {
                     currentStreakStart = daily.date
                 }
@@ -442,23 +467,24 @@ public final class HealthStatsLibrary {
         var currentStreakStart: Date?
         
         for daily in sortedDays {
-            if daily.exerciseMinutes > 0 { // Has workout data
+            if daily.exerciseMinutes > 0 { // Any movement counts
                 if currentStreak == 0 {
-                    currentStreakStart = daily.date
+                    currentStreakStart = daily.date // Start of a new streak
                 }
                 currentStreak += 1
                 
                 if currentStreak > maxStreak {
                     maxStreak = currentStreak
                     maxStreakStart = currentStreakStart
-                    maxStreakEnd = daily.date
+                    maxStreakEnd = daily.date // New record!
                 }
             } else {
-                currentStreak = 0
+                currentStreak = 0 // Streak broken
                 currentStreakStart = nil
             }
         }
         
+        // Only update if we found a better streak
         if maxStreak > highscore.workoutStreakRecord {
             highscore.workoutStreakRecord = maxStreak
             highscore.workoutStreakRecordStartDate = maxStreakStart
@@ -466,26 +492,28 @@ public final class HealthStatsLibrary {
         }
     }
     
+    /// Updates analytics for current time periods that are still changing
+    /// Only touches periods that might be affected by new data
     private func refreshCurrentPeriodAnalytics(from startDate: Date, to endDate: Date, progressCallback: @escaping (Double) -> Void) throws {
         let calendar = Calendar.current
         
         // Update current week (if affected)
         let currentWeekStart = calendar.dateInterval(of: .weekOfYear, for: endDate)?.start ?? endDate
-        if startDate <= currentWeekStart {
+        if startDate <= currentWeekStart { // Week might have changed
             progressCallback(0.25)
             try updateWeeklyAnalyticsForWeek(currentWeekStart)
         }
         
         // Update current month (if affected)
         let currentMonthStart = calendar.dateInterval(of: .month, for: endDate)?.start ?? endDate
-        if startDate <= currentMonthStart {
+        if startDate <= currentMonthStart { // Month might have changed
             progressCallback(0.5)
             try updateMonthlyAnalyticsForMonth(currentMonthStart)
         }
         
         // Update current year (if affected)
         let currentYearStart = calendar.dateInterval(of: .year, for: endDate)?.start ?? endDate
-        if startDate <= currentYearStart {
+        if startDate <= currentYearStart { // Year might have changed
             progressCallback(0.75)
             try updateYearlyAnalyticsForYear(currentYearStart)
         }
@@ -597,6 +625,7 @@ public final class HealthStatsLibrary {
         if let existing = existingWeekly {
             updateWeeklyRecord(existing, with: aggregatedData, weekRange: (start: weekStart, end: weekEnd))
         } else {
+            // Create new weekly record with next available ID
             let highestID = try getHighestWeeklyAnalyticsID()
             let weeklyAnalytics = createWeeklyAnalytics(
                 id: highestID + 1,
@@ -616,7 +645,7 @@ public final class HealthStatsLibrary {
         
         // Get or create monthly analytics for this month
         let existingMonthly = try getMonthlyAnalyticsForMonth(components.year!, components.month!)
-        let aggregatedData = try aggregateDailyDataForMonth(monthStart, monthEnd)
+        let aggregatedData = try aggregateDailyDataForMonth(monthStart, monthEnd) // Roll up daily data
         
         if let existing = existingMonthly {
             updateMonthlyRecord(existing, with: aggregatedData, monthRange: (start: monthStart, end: monthEnd))
@@ -642,7 +671,7 @@ public final class HealthStatsLibrary {
         
         // Get or create yearly analytics for this year
         let existingYearly = try getYearlyAnalyticsForYear(year)
-        let aggregatedData = try aggregateDailyDataForYear(yearStart, yearEnd)
+        let aggregatedData = try aggregateDailyDataForYear(yearStart, yearEnd) // Aggregate from monthly for performance
         
         if let existing = existingYearly {
             updateYearlyRecord(existing, with: aggregatedData, yearRange: (start: yearStart, end: yearEnd))
@@ -660,7 +689,8 @@ public final class HealthStatsLibrary {
         try modelContext.save()
     }
     
-    // Helper methods that need to be accessible (moved from DataUpdater)
+    // MARK: - Private Query Helpers
+    // Internal methods for finding specific analytics records
     private func getWeeklyAnalyticsForWeek(_ weekStart: Date) throws -> WeeklyAnalytics? {
         let descriptor = FetchDescriptor<WeeklyAnalytics>(
             predicate: #Predicate { analytics in
@@ -740,7 +770,7 @@ public final class HealthStatsLibrary {
         let calendar = Calendar.current
         let year = calendar.component(.year, from: yearStart)
         
-        // Aggregate from monthly analytics instead of daily analytics for better performance
+        // Smart optimization: use monthly data instead of daily for yearly aggregation
         let descriptor = FetchDescriptor<MonthlyAnalytics>(
             predicate: #Predicate { analytics in
                 analytics.year == year

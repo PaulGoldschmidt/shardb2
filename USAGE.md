@@ -1,5 +1,8 @@
-# shardb2 Guide
-A **synchronous** Swift package for managing health statistics applications. Uses SwiftData as database abstraction and provides comprehensive health data analytics. **No async/await required** - all operations use completion callbacks for progress tracking.
+# shardb2 Usage Guide / Function overview
+
+TODO @paul: Add structured explanation for Swift Package index.
+
+A Swift package for managing health statistics applications with comprehensive health data analytics. Uses SwiftData for database persistence and provides both synchronous and asynchronous operations with progress tracking callbacks.
 
 ## Setup
 
@@ -35,48 +38,54 @@ healthStore.requestAuthorization(toShare: [], read: [stepCountType]) { success, 
 // 4. Create a user
 let user = try healthStats.createUser(birthdate: userBirthdate, usesMetric: true)
 
-// 5. Check authorization status
+// 5. Check and update authorization status
 let authStatus = healthStats.getHealthKitAuthorizationStatus(for: .stepCount)
-print("HealthKit status: \(authStatus)")
+let isAuthorized = try healthStats.updateUserHealthKitAuthorizationStatus(for: user)
+print("HealthKit authorized: \(isAuthorized)")
 
-// 6. Set the user's actual first HealthKit record date (recommended after authorization)
-try healthStats.setUserFirstHealthKitRecord(user)
+// 6. Set the user's actual first HealthKit record date (async - recommended after authorization)
+try await healthStats.setUserFirstHealthKitRecord(user)
 
-// 7. Initialize database with comprehensive health data
+// 7. Initialize database with comprehensive health data (async)
 // This fetches ALL available health data from the user's first HealthKit sample to present
 // and processes them into daily, weekly, monthly, and yearly analytics
-
-// 8. Initialize database with detailed progress tracking
-try healthStats.initializeDatabase(for: user) { progress in
+try await healthStats.initializeDatabase(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
-// 9. Refresh all data efficiently (recommended for regular updates)
-try healthStats.refreshAllData(for: user) { progress in
+// 8. Refresh all data efficiently (async - recommended for regular updates)
+try await healthStats.refreshAllData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
-// Alternative: Update missing data incrementally (legacy method)
-try healthStats.updateMissingData(for: user) { progress in
+// Alternative: Update missing data incrementally (async - legacy method)
+try await healthStats.updateMissingData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 
-// 10. Retrieve stored data
+// Alternative: Refresh just current day data (async)
+try await healthStats.refreshCurrentDay(for: user) { progress in
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+
+// 9. Retrieve stored data (synchronous)
 let todaySteps = try healthStats.getDailyAnalytics(for: Date())?.steps ?? 0
 let allUsers = try healthStats.getAllUsers()
 print("Steps today: \(todaySteps)")
 
-// 11. Get personal records and achievements
+// 10. Get personal records and achievements (synchronous)
 let highscores = try healthStats.getHighscoreRecord()
 print("Personal best steps: \(highscores?.mostStepsInADay ?? 0)")
 print("Longest sleep: \(highscores?.longestSleep ?? 0) minutes")
 print("Sleep streak record: \(highscores?.sleepStreakRecord ?? 0) days")
 
-// 12. Highscores are automatically updated during refreshAllData()
+// 11. Highscores are automatically updated during refreshAllData()
 // No manual update needed - use refreshAllData() for efficient updates
 ```
 
 ## Analytics Queries
+
+All query methods are synchronous and throw errors on failure.
 
 ### Daily Analytics
 ```swift
@@ -146,31 +155,49 @@ let latestYear = try healthStats.getLatestYearlyAnalytics()
 
 ## User Management
 
+All user management operations are synchronous except where noted.
+
 ```swift
-// Create user
+// Create user (synchronous)
 let user = try healthStats.createUser(birthdate: birthdate, usesMetric: true)
 
-// Get user by ID
+// Get user by ID (synchronous)
 let retrievedUser = try healthStats.getUser(by: userID)
 
-// Update user properties
+// Get all users (synchronous)
+let allUsers = try healthStats.getAllUsers()
+
+// Update user properties (synchronous)
 user.healthkitAuthorized = true
 user.lastProcessedAt = Date()
 try healthStats.updateUser(user)
 
-// Delete user
+// Update user's HealthKit authorization status (synchronous)
+let isAuthorized = try healthStats.updateUserHealthKitAuthorizationStatus(for: user)
+
+// Set user's first HealthKit record date (async)
+try await healthStats.setUserFirstHealthKitRecord(user)
+
+// Delete user (synchronous)
 try healthStats.deleteUser(user)
 
-// Clear all analytics data while preserving user data
-try healthStats.clearDatabaseExceptUser(user)
+// Clear all analytics data while preserving user data (async)
+try await healthStats.clearDatabaseExceptUser(user)
 ```
 
 ## Complete HealthStatsLibrary API Reference
 
-### HealthKit Data Functions
-- `getHealthKitAuthorizationStatus(for: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus` - Checks HealthKit permission status
-- `initializeDatabase(for: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - Comprehensive database initialization with detailed progress updates
-- `updateMissingData(for: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - Incremental data updates based on user's lastProcessedAt timestamp
+### HealthKit Integration Functions
+- `getHealthKitAuthorizationStatus(for: HKQuantityTypeIdentifier = .stepCount) -> HKAuthorizationStatus` - Checks HealthKit permission status (synchronous)
+- `updateUserHealthKitAuthorizationStatus(for: User) throws -> Bool` - Updates user model with current HealthKit authorization status (synchronous)
+- `setUserFirstHealthKitRecord(_ user: User) async throws` - Queries HealthKit to find earliest sample and sets firstHealthKitRecord (asynchronous)
+
+### Database Operations
+- `initializeDatabase(for: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws` - Comprehensive database initialization with detailed progress updates (asynchronous)
+- `updateMissingData(for: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws` - Incremental data updates based on user's lastProcessedAt timestamp (asynchronous)
+- `refreshAllData(for: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws` - **Recommended**: Efficiently refreshes only new data since last update, updates current period analytics, and performs incremental highscore checking (asynchronous)
+- `refreshCurrentDay(for: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws` - Refresh current day data specifically to get latest HealthKit updates (asynchronous)
+- `clearDatabaseExceptUser(_ user: User) async throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 and re-detects firstHealthKitRecord for full reprocessing (asynchronous)
 
 ### Daily Analytics Query Functions
 - `getDailyAnalytics(for: Date) throws -> DailyAnalytics?` - Get analytics for specific date
@@ -204,19 +231,23 @@ try healthStats.clearDatabaseExceptUser(user)
 - `updateUser(_ user: User) throws` - Saves user changes
 - `deleteUser(_ user: User) throws` - Removes user from database
 
-### Database Management Functions
-- `clearDatabaseExceptUser(_ user: User) throws` - Clears all analytics data while preserving user data, resets user's lastProcessedAt to 1999-01-01 and re-detects firstHealthKitRecord for full reprocessing
-- `setUserFirstHealthKitRecord(_ user: User) throws` - Queries HealthKit to find the user's earliest sample and sets firstHealthKitRecord accordingly
-- `refreshAllData(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) throws` - **Recommended**: Efficiently refreshes only new data since last update, updates current period analytics, and incremental highscore checking
-
 ### Highscore Functions
 - `getHighscoreRecord() throws -> HighscoreRecord?` - Retrieves the user's personal records and achievements
 
-### Data Models
+## Data Models
 
-**User**: userID (UUID), birthdate (Date), lastProcessedAt (Date), firstInit (Date), firstHealthKitRecord (Date), highscoresLastUpdated (Date), receivesNotifications (Bool), healthkitAuthorized (Bool), usesMetric (Bool)
+**User**: Stores user preferences and tracking metadata
+- userID (UUID) - Unique identifier
+- birthdate (Date) - User's birth date
+- lastProcessedAt (Date) - Last data processing timestamp
+- firstInit (Date) - Initial creation timestamp
+- firstHealthKitRecord (Date) - Earliest HealthKit sample date
+- highscoresLastUpdated (Date) - Last highscore calculation timestamp
+- receivesNotifications (Bool) - Notification preferences
+- healthkitAuthorized (Bool) - HealthKit authorization status
+- usesMetric (Bool) - Measurement unit preference
 
-**DailyAnalytics**: Comprehensive daily health metrics with strongly typed properties:
+**DailyAnalytics**: Comprehensive daily health metrics with strongly typed properties
 - id (Int) - Auto-incrementing identifier
 - date (Date, unique) - The day these metrics represent
 - steps (Int) - Step count
@@ -238,14 +269,14 @@ try healthStats.clearDatabaseExceptUser(user)
 - sleepREM (Int) - REM sleep time in minutes
 - recordedAt (Date) - When this record was created
 
-**WeeklyAnalytics**: Weekly aggregated health metrics with the same data points as DailyAnalytics:
+**WeeklyAnalytics**: Weekly aggregated health metrics with the same data points as DailyAnalytics
 - id (Int) - Auto-incrementing identifier
 - startDate (Date) - Start of the week
 - endDate (Date) - End of the week
 - All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
 
-**MonthlyAnalytics**: Monthly aggregated health metrics:
+**MonthlyAnalytics**: Monthly aggregated health metrics
 - id (Int) - Auto-incrementing identifier
 - year (Int) - The year this data represents
 - month (Int) - The month (1-12) this data represents
@@ -254,7 +285,7 @@ try healthStats.clearDatabaseExceptUser(user)
 - All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
 
-**YearlyAnalytics**: Yearly aggregated health metrics:
+**YearlyAnalytics**: Yearly aggregated health metrics
 - id (Int) - Auto-incrementing identifier
 - year (Int, unique) - The year this data represents
 - startDate (Date) - Start of the year (January 1st)
@@ -262,7 +293,7 @@ try healthStats.clearDatabaseExceptUser(user)
 - All the same health metrics as DailyAnalytics
 - recordedAt (Date) - When this record was created
 
-**HighscoreRecord**: Personal records and achievements:
+**HighscoreRecord**: Personal records and achievements
 - id (Int, unique) - Record identifier (usually 1 per user)
 - peakHeartRate (Double) + date - Highest recorded heart rate in BPM
 - peakRunningSpeed (Double) + date - Fastest running speed in m/s
@@ -283,17 +314,38 @@ try healthStats.clearDatabaseExceptUser(user)
 - lastUpdated (Date) - When records were last calculated
 - recordedAt (Date) - When this record was created
 
-**InitializationProgress**: Progress tracking for database initialization:
+**InitializationProgress**: Progress tracking for database operations
 - percentage (Double) - Progress percentage (0.0 to 100.0)
 - currentTask (String) - Human-readable description of current operation
 
-## Incremental Data Updates
+## Data Processing Methods
+
+### Full Database Initialization
+
+The `initializeDatabase` function performs a complete health data import and processing:
+
+```swift
+// Initialize database with detailed progress tracking (async)
+try await healthStats.initializeDatabase(for: user) { progress in
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+```
+
+**Process Overview:**
+1. **Phase 1 (0-20%)**: Fetch all HealthKit data from user's first sample to present
+2. **Phase 2 (20-40%)**: Process daily analytics
+3. **Phase 3 (40-60%)**: Aggregate weekly analytics
+4. **Phase 4 (60-80%)**: Aggregate monthly analytics
+5. **Phase 5 (80-95%)**: Aggregate yearly analytics
+6. **Phase 6 (95-100%)**: Calculate personal records and update timestamps
+
+### Incremental Data Updates
 
 The `updateMissingData` function allows you to add missing health data incrementally based on a user's `lastProcessedAt` timestamp:
 
 ```swift
-// Update missing data from lastProcessedAt to now
-try healthStats.updateMissingData(for: user) { progress in
+// Update missing data from lastProcessedAt to now (async)
+try await healthStats.updateMissingData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 ```
@@ -314,17 +366,48 @@ try healthStats.updateMissingData(for: user) { progress in
 5. **Phase 5 (85-95%)**: Update yearly analytics for affected years
 6. **Phase 6 (95-100%)**: Update user's lastProcessedAt timestamp
 
+### Efficient Data Refresh
+
+The `refreshAllData` function provides the most efficient way to update existing data:
+
+```swift
+// Refresh all data efficiently (async)
+try await healthStats.refreshAllData(for: user) { progress in
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+```
+
+**Optimized Process:**
+1. **Phase 1 (0-30%)**: Update missing HealthKit data since last refresh
+2. **Phase 2 (30-50%)**: Refresh current period analytics (week/month/year)
+3. **Phase 3 (50-80%)**: Incremental highscore updates with only new data
+4. **Phase 4 (80-100%)**: Update user timestamps
+
+### Current Day Refresh
+
+For real-time updates of today's data:
+
+```swift
+// Refresh current day data (async)
+try await healthStats.refreshCurrentDay(for: user) { progress in
+    print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
+}
+```
+
 ## Requirements
 
-- iOS 18+ / macOS 14+
+- iOS 18.0+
+- macOS 14.0+ (for testing)
 - HealthKit capability enabled
 - User permission for health data access
 
 ## Key Features
 
-- **Fully Synchronous**: No async/await required - all operations are synchronous with callback-based progress reporting
+- **Mixed Synchronous/Asynchronous API**: Query methods are synchronous for immediate data access, while data processing operations are asynchronous with progress callbacks
 - **Swift 6 Compatible**: No concurrency warnings or issues
 - **Comprehensive Health Data**: Supports 14+ HealthKit data types including steps, heart rate, sleep, and exercise metrics
 - **Multi-level Analytics**: Automatic aggregation into daily, weekly, monthly, and yearly analytics
 - **Incremental Updates**: Efficient data updates based on last processed timestamp
+- **Personal Records**: Automatic tracking of achievements, streaks, and personal bests
 - **SwiftData Integration**: Modern Core Data abstraction for reliable persistence
+- **Progress Tracking**: Real-time feedback during all data processing operations

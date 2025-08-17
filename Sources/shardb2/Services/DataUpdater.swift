@@ -2,6 +2,8 @@ import Foundation
 import SwiftData
 import HealthKit
 
+/// Handles incremental data updates - much more efficient than full rebuilds
+/// The workhorse for keeping data current without starting from scratch
 public final class DataUpdater {
     private let modelContext: ModelContext
     private let healthDataAggregator = HealthDataAggregator()
@@ -10,6 +12,8 @@ public final class DataUpdater {
         self.modelContext = modelContext
     }
     
+    /// Main entry point for incremental updates
+    /// Always checks auth status first before doing any heavy lifting
     public func updateMissingData(for user: User, healthKitManager: HealthKitManager, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         // Check HealthKit authorization first and always update user model
         let authStatus = healthKitManager.getAuthorizationStatus(for: .stepCount)
@@ -19,13 +23,13 @@ public final class DataUpdater {
         let previousAuthStatus = user.healthkitAuthorized
         user.healthkitAuthorized = isAuthorized
         
-        // Save if status changed
+        // Only hit the database if something changed
         if previousAuthStatus != isAuthorized {
             try modelContext.save()
         }
         
         if !isAuthorized {
-            // Provide user feedback about authorization status
+            // Give helpful feedback about what's wrong with permissions
             let statusMessage: String
             switch authStatus {
             case .notDetermined:
@@ -37,10 +41,10 @@ public final class DataUpdater {
             }
             
             progressCallback(InitializationProgress(percentage: 100.0, currentTask: statusMessage))
-            return
+            return // Bail out early if we can't access HealthKit
         }
         
-        // Authorization confirmed - proceed with update
+        // All good with permissions - let's do the actual work
         try await performDataUpdate(for: user, progressCallback: progressCallback)
     }
     

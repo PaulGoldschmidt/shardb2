@@ -2,6 +2,8 @@ import Foundation
 import SwiftData
 import HealthKit
 
+/// Handles the big job of setting up the database from scratch
+/// This is what runs on first app launch or after a database reset
 public final class DatabaseInitializer {
     private let modelContext: ModelContext
     private let healthDataAggregator = HealthDataAggregator()
@@ -10,13 +12,16 @@ public final class DatabaseInitializer {
         self.modelContext = modelContext
     }
     
+    /// Main entry point for database initialization
+    /// This kicks off the whole process of fetching and processing health data
     public func initializeDatabase(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         try await performInitialization(for: user, progressCallback: progressCallback)
     }
     
+    /// The actual initialization work - broken down into phases for progress tracking
     private func performInitialization(for user: User, progressCallback: @escaping (InitializationProgress) -> Void) async throws {
         let startDate = user.firstHealthKitRecord
-        let endDate = Date()
+        let endDate = Date() // Process everything up to now
         
         // Phase 1: Fetch all HealthKit data (1% to 10% of total progress)
         progressCallback(InitializationProgress(percentage: 0.0, currentTask: "Starting database initialization..."))
@@ -28,25 +33,25 @@ public final class DatabaseInitializer {
         
         progressCallback(InitializationProgress(percentage: 10.0, currentTask: "HealthKit data fetching completed"))
         
-        // Phase 2: Create daily analytics (30% of progress, 10-40%)
+        // Phase 2: Process into daily records (30% of progress, 10-40%)
         try createDailyAnalytics(from: dailyHealthData, totalDays: totalDays, progressCallback: progressCallback)
         
-        // Phase 3: Create weekly analytics (20% of progress, 40-60%)
+        // Phase 3: Roll up into weekly summaries (20% of progress, 40-60%)
         try createWeeklyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
-        // Phase 4: Create monthly analytics (15% of progress, 60-75%)
+        // Phase 4: Create monthly summaries (15% of progress, 60-75%)
         try createMonthlyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
-        // Phase 5: Create yearly analytics (15% of progress, 75-90%)
+        // Phase 5: Create yearly summaries (15% of progress, 75-90%)
         try createYearlyAnalytics(from: dailyHealthData, progressCallback: progressCallback)
         
-        // Phase 6: Calculate highscores (5% of progress, 90-95%)
+        // Phase 6: Find all the personal bests (5% of progress, 90-95%)
         progressCallback(InitializationProgress(percentage: 90.0, currentTask: "Calculating personal records..."))
         try calculateHighscores()
         
-        // Phase 7: Update user (5% of progress, 95-100%)
+        // Phase 7: Update user timestamps (5% of progress, 95-100%)
         progressCallback(InitializationProgress(percentage: 95.0, currentTask: "Updating user record..."))
-        user.lastProcessedAt = Date()
+        user.lastProcessedAt = Date() // Mark when we finished processing
         try modelContext.save()
         
         progressCallback(InitializationProgress(percentage: 100.0, currentTask: "Database initialization completed!"))

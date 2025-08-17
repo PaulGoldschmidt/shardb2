@@ -1,11 +1,15 @@
 import Foundation
 import HealthKit
 
+/// Handles the heavy lifting of fetching and aggregating HealthKit data
+/// This is where we talk to Apple's HealthKit APIs
 public final class HealthDataAggregator {
     private let healthStore = HKHealthStore()
     
     public init() {}
     
+    /// Scans through all HealthKit data types to find the very first sample
+    /// This tells us how far back we can go with data processing
     public func findEarliestHealthKitSample() async throws -> Date {
         let quantityTypes = getHealthKitQuantityTypes()
         var earliestDate: Date?
@@ -19,7 +23,7 @@ public final class HealthDataAggregator {
             }
         }
         
-        // Check sleep analysis (category type)
+        // Sleep is a special category type, not a quantity
         if let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
            let sleepDate = try await fetchEarliestSleepSampleDate(for: sleepType) {
             if earliestDate == nil || sleepDate < earliestDate! {
@@ -27,7 +31,7 @@ public final class HealthDataAggregator {
             }
         }
         
-        // Return the earliest date found, or fallback to HealthKit launch date
+        // Return the earliest date found, or fallback to HealthKit launch date if nothing found
         return earliestDate ?? DateComponents(calendar: Calendar.current, year: 2014, month: 9, day: 1).date!
     }
     
@@ -38,7 +42,7 @@ public final class HealthDataAggregator {
         var dailyData: [Date: HealthDataPoint] = [:]
         let calendar = Calendar.current
         
-        // Initialize all days with empty data points
+        // Initialize all days with empty data points so we don't miss any days
         var currentDate = calendar.startOfDay(for: startDate)
         let finalDate = calendar.startOfDay(for: endDate)
         
@@ -47,7 +51,7 @@ public final class HealthDataAggregator {
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
         }
         
-        // Fetch data for each quantity type
+        // Now go through each health metric and fetch the data
         for (index, quantityType) in quantityTypes.enumerated() {
             let typeName = getHumanReadableName(for: quantityType.identifier)
             let progress = 1.0 + (Double(index) / Double(quantityTypes.count)) * 7.0 // 1% to 8%
