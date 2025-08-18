@@ -331,14 +331,6 @@ try await healthStats.initializeDatabase(for: user) { progress in
 }
 ```
 
-**Process Overview:**
-1. **Phase 1 (0-20%)**: Fetch all HealthKit data from user's first sample to present
-2. **Phase 2 (20-40%)**: Process daily analytics
-3. **Phase 3 (40-60%)**: Aggregate weekly analytics
-4. **Phase 4 (60-80%)**: Aggregate monthly analytics
-5. **Phase 5 (80-95%)**: Aggregate yearly analytics
-6. **Phase 6 (95-100%)**: Calculate personal records and update timestamps
-
 ### Incremental Data Updates
 
 The `updateMissingData` function allows you to add missing health data incrementally based on a user's `lastProcessedAt` timestamp:
@@ -358,14 +350,6 @@ try await healthStats.updateMissingData(for: user) { progress in
 - Provides detailed progress updates throughout the process
 - Updates user's `lastProcessedAt` timestamp upon completion
 
-**Update Process:**
-1. **Phase 1 (0-15%)**: Fetch missing HealthKit data from lastProcessedAt to now
-2. **Phase 2 (15-40%)**: Update daily analytics with overwrite logic
-3. **Phase 3 (40-65%)**: Update weekly analytics for affected weeks
-4. **Phase 4 (65-85%)**: Update monthly analytics for affected months
-5. **Phase 5 (85-95%)**: Update yearly analytics for affected years
-6. **Phase 6 (95-100%)**: Update user's lastProcessedAt timestamp
-
 ### Efficient Data Refresh
 
 The `refreshAllData` function provides the most efficient way to update existing data:
@@ -376,12 +360,6 @@ try await healthStats.refreshAllData(for: user) { progress in
     print("[\(String(format: "%.1f", progress.percentage))%] \(progress.currentTask)")
 }
 ```
-
-**Optimized Process:**
-1. **Phase 1 (0-30%)**: Update missing HealthKit data since last refresh
-2. **Phase 2 (30-50%)**: Refresh current period analytics (week/month/year)
-3. **Phase 3 (50-80%)**: Incremental highscore updates with only new data
-4. **Phase 4 (80-100%)**: Update user timestamps
 
 ### Current Day Refresh
 
