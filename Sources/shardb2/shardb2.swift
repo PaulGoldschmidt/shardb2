@@ -1,6 +1,87 @@
 import Foundation
 import SwiftData
 import HealthKit
+import SwiftUI
+
+/// UI-ready health metric for display in the app
+public struct CardioMetric: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let value: String
+    public let unit: String
+    public let icon: String
+    public let color: Color
+    
+    public init(title: String, value: String, unit: String, icon: String, color: Color) {
+        self.title = title
+        self.value = value
+        self.unit = unit
+        self.icon = icon
+        self.color = color
+    }
+}
+
+/// Data point for time series charts
+public struct TimeSeriesDataPoint: Identifiable, Equatable {
+    public let id = UUID()
+    public let date: Date
+    public let value: Double
+    public let formattedValue: String
+    public let unit: String
+    
+    public init(date: Date, value: Double, formattedValue: String, unit: String) {
+        self.date = date
+        self.value = value
+        self.formattedValue = formattedValue
+        self.unit = unit
+    }
+    
+    public static func == (lhs: TimeSeriesDataPoint, rhs: TimeSeriesDataPoint) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.date == rhs.date &&
+               lhs.value == rhs.value &&
+               lhs.formattedValue == rhs.formattedValue &&
+               lhs.unit == rhs.unit
+    }
+}
+
+/// Complete time series data for charts
+public struct TimeSeriesData {
+    public let dataPoints: [TimeSeriesDataPoint]
+    public let metricTitle: String
+    public let metricIcon: String
+    public let metricColor: Color
+    public let metricUnit: String
+    
+    public init(dataPoints: [TimeSeriesDataPoint], metricTitle: String, metricIcon: String, metricColor: Color, metricUnit: String) {
+        self.dataPoints = dataPoints
+        self.metricTitle = metricTitle
+        self.metricIcon = metricIcon
+        self.metricColor = metricColor
+        self.metricUnit = metricUnit
+    }
+}
+
+/// Internal helper for aggregating health data
+struct HealthDataPoint {
+    var steps: Int = 0
+    var cyclingDistance: Double = 0.0
+    var walkingDistance: Double = 0.0
+    var runningDistance: Double = 0.0
+    var swimmingDistance: Double = 0.0
+    var swimmingStrokes: Int = 0
+    var crossCountrySkiingDistance: Double = 0.0
+    var downhillSnowSportsDistance: Double = 0.0
+    var energyActive: Double = 0.0
+    var energyResting: Double = 0.0
+    var heartbeats: Int = 0
+    var stairsClimbed: Int = 0
+    var exerciseMinutes: Int = 0
+    var standMinutes: Int = 0
+    var sleepTotal: Int = 0
+    var sleepDeep: Int = 0
+    var sleepREM: Int = 0
+}
 
 /// Main interface for health statistics tracking and analytics
 /// Combines HealthKit data fetching with SwiftData persistence
@@ -981,5 +1062,344 @@ public final class HealthStatsLibrary {
             sleepREM: data.sleepREM,
             recordedAt: Date()
         )
+    }
+    
+    // MARK: - Highscore Data Export
+    // Convert highscore records into formatted display metrics
+    
+    /// Get formatted highscore metrics for display
+    public func getFormattedHighscores() throws -> [CardioMetric] {
+        guard let highscoreRecord = try getHighscoreRecord() else {
+            return []
+        }
+        
+        var formattedHighscores: [CardioMetric] = []
+        
+        // Steps record
+        if highscoreRecord.mostStepsInADay > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Most Steps in a Day",
+                value: formatValue(Double(highscoreRecord.mostStepsInADay), decimals: 0),
+                unit: "steps",
+                icon: "figure.walk",
+                color: .blue
+            ))
+        }
+        
+        // Calories record
+        if highscoreRecord.mostCaloriesInADay > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Most Calories in a Day",
+                value: formatValue(highscoreRecord.mostCaloriesInADay, decimals: 0),
+                unit: "cal",
+                icon: "flame.fill",
+                color: .orange
+            ))
+        }
+        
+        // Exercise record
+        if highscoreRecord.mostExerciseMinutesInADay > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Most Exercise in a Day",
+                value: formatTime(highscoreRecord.mostExerciseMinutesInADay),
+                unit: "min",
+                icon: "figure.run",
+                color: .green
+            ))
+        }
+        
+        // Distance records
+        if highscoreRecord.longestWalk > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Longest Walk",
+                value: formatDistance(highscoreRecord.longestWalk),
+                unit: "km",
+                icon: "figure.walk",
+                color: .green
+            ))
+        }
+        
+        if highscoreRecord.longestBikeRide > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Longest Bike Ride",
+                value: formatDistance(highscoreRecord.longestBikeRide),
+                unit: "km",
+                icon: "bicycle",
+                color: .blue
+            ))
+        }
+        
+        if highscoreRecord.longestSwim > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Longest Swim",
+                value: formatDistance(highscoreRecord.longestSwim),
+                unit: "km",
+                icon: "figure.pool.swim",
+                color: .cyan
+            ))
+        }
+        
+        // Sleep records
+        if highscoreRecord.longestSleep > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Longest Sleep",
+                value: formatTime(highscoreRecord.longestSleep),
+                unit: "min",
+                icon: "bed.double.fill",
+                color: .indigo
+            ))
+        }
+        
+        if highscoreRecord.mostDeepSleep > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Most Deep Sleep",
+                value: formatTime(highscoreRecord.mostDeepSleep),
+                unit: "min",
+                icon: "moon.zzz.fill",
+                color: .blue
+            ))
+        }
+        
+        if highscoreRecord.mostREMSleep > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Most REM Sleep",
+                value: formatTime(highscoreRecord.mostREMSleep),
+                unit: "min",
+                icon: "brain.head.profile",
+                color: .pink
+            ))
+        }
+        
+        // Streak records
+        if highscoreRecord.sleepStreakRecord > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Sleep Streak Record",
+                value: "\(highscoreRecord.sleepStreakRecord)",
+                unit: "days",
+                icon: "calendar",
+                color: .indigo
+            ))
+        }
+        
+        if highscoreRecord.workoutStreakRecord > 0 {
+            formattedHighscores.append(CardioMetric(
+                title: "Workout Streak Record",
+                value: "\(highscoreRecord.workoutStreakRecord)",
+                unit: "days",
+                icon: "calendar",
+                color: .green
+            ))
+        }
+        
+        return formattedHighscores
+    }
+    
+    // MARK: - UI Data Export
+    // Convert stored analytics into formatted CardioMetrics for display
+    
+    /// Get formatted metrics for widget display (filtered to most important ones)
+    public func getWidgetMetrics() throws -> [CardioMetric] {
+        guard let today = try getDailyAnalytics(for: Date()) else {
+            return []
+        }
+        
+        return [
+            CardioMetric(
+                title: "Steps",
+                value: formatValue(Double(today.steps), decimals: 0),
+                unit: "steps",
+                icon: "figure.walk",
+                color: .blue
+            ),
+            CardioMetric(
+                title: "Active Energy",
+                value: formatValue(today.energyActive, decimals: 0),
+                unit: "cal",
+                icon: "flame.fill",
+                color: .orange
+            ),
+            CardioMetric(
+                title: "Exercise Time",
+                value: formatTime(today.exerciseMinutes),
+                unit: "min",
+                icon: "figure.run",
+                color: .green
+            )
+        ]
+    }
+    
+    /// Get formatted metrics for a specific date range
+    public func getCustomRangeMetrics(from startDate: Date, to endDate: Date) throws -> [CardioMetric] {
+        let dailyRecords = try getDailyAnalytics(from: startDate, to: endDate)
+        let aggregated = aggregateHealthDataFromDailyAnalytics(dailyRecords)
+        let days = dailyRecords.count
+        
+        return formatHealthDataPoint(aggregated, days: days)
+    }
+    
+    /// Get metrics for standard periods (today, this week, etc.)
+    public func getPeriodMetrics(for period: String) throws -> [CardioMetric] {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        switch period.lowercased() {
+        case "today":
+            guard let today = try getDailyAnalytics(for: now) else { return [] }
+            return formatDailyAnalytics(today)
+            
+        case "thisweek":
+            let weekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+            let weekEnd = calendar.dateInterval(of: .weekOfYear, for: now)?.end ?? now
+            return try getCustomRangeMetrics(from: weekStart, to: weekEnd)
+            
+        case "thismonth":
+            let monthStart = calendar.dateInterval(of: .month, for: now)?.start ?? now
+            let monthEnd = calendar.dateInterval(of: .month, for: now)?.end ?? now
+            return try getCustomRangeMetrics(from: monthStart, to: monthEnd)
+            
+        case "lastmonth":
+            let lastMonth = calendar.date(byAdding: .month, value: -1, to: now) ?? now
+            let monthStart = calendar.dateInterval(of: .month, for: lastMonth)?.start ?? now
+            let monthEnd = calendar.dateInterval(of: .month, for: lastMonth)?.end ?? now
+            return try getCustomRangeMetrics(from: monthStart, to: monthEnd)
+            
+        case "last30days":
+            let startDate = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+            return try getCustomRangeMetrics(from: startDate, to: now)
+            
+        case "lastyear":
+            let lastYear = calendar.date(byAdding: .year, value: -1, to: now) ?? now
+            let yearStart = calendar.dateInterval(of: .year, for: lastYear)?.start ?? now
+            let yearEnd = calendar.dateInterval(of: .year, for: lastYear)?.end ?? now
+            return try getCustomRangeMetrics(from: yearStart, to: yearEnd)
+            
+        case "last365days":
+            let startDate = calendar.date(byAdding: .day, value: -365, to: now) ?? now
+            return try getCustomRangeMetrics(from: startDate, to: now)
+            
+        case "alltime":
+            let allDaily = try getAllDailyAnalytics()
+            if allDaily.isEmpty { return [] }
+            let earliest = allDaily.min(by: { $0.date < $1.date })?.date ?? now
+            return try getCustomRangeMetrics(from: earliest, to: now)
+            
+        default:
+            return []
+        }
+    }
+    
+    /// Get time series data for charts
+    public func getTimeSeriesData(metricType: String, from startDate: Date, to endDate: Date) throws -> TimeSeriesData {
+        let dailyRecords = try getDailyAnalytics(from: startDate, to: endDate)
+        let dataPoints: [TimeSeriesDataPoint] = dailyRecords.compactMap { daily in
+            let (value, unit, color) = extractMetricValue(from: daily, type: metricType)
+            guard value > 0 else { return nil }
+            
+            return TimeSeriesDataPoint(
+                date: daily.date,
+                value: value,
+                formattedValue: formatValue(value, decimals: metricType.contains("distance") ? 2 : 0),
+                unit: unit
+            )
+        }
+        
+        let (title, icon, color) = getMetricDisplayInfo(for: metricType)
+        
+        return TimeSeriesData(
+            dataPoints: dataPoints,
+            metricTitle: title,
+            metricIcon: icon,
+            metricColor: color,
+            metricUnit: dataPoints.first?.unit ?? ""
+        )
+    }
+    
+    // MARK: - Private Formatting Helpers
+    
+    private func formatDailyAnalytics(_ daily: DailyAnalytics) -> [CardioMetric] {
+        return [
+            CardioMetric(title: "Steps", value: formatValue(Double(daily.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: .blue),
+            CardioMetric(title: "Walking Distance", value: formatDistance(daily.walkingDistance), unit: "km", icon: "figure.walk", color: .green),
+            CardioMetric(title: "Running Distance", value: formatDistance(daily.runningDistance), unit: "km", icon: "figure.run", color: .red),
+            CardioMetric(title: "Cycling Distance", value: formatDistance(daily.cyclingDistance), unit: "km", icon: "bicycle", color: .blue),
+            CardioMetric(title: "Active Energy", value: formatValue(daily.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: .orange),
+            CardioMetric(title: "Resting Energy", value: formatValue(daily.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: .gray),
+            CardioMetric(title: "Exercise Time", value: formatTime(daily.exerciseMinutes), unit: "min", icon: "figure.run", color: .green),
+            CardioMetric(title: "Stand Time", value: formatTime(daily.standMinutes), unit: "min", icon: "figure.stand", color: .purple),
+            CardioMetric(title: "Sleep Total", value: formatTime(daily.sleepTotal), unit: "min", icon: "bed.double.fill", color: .indigo),
+            CardioMetric(title: "Deep Sleep", value: formatTime(daily.sleepDeep), unit: "min", icon: "moon.zzz.fill", color: .blue),
+            CardioMetric(title: "REM Sleep", value: formatTime(daily.sleepREM), unit: "min", icon: "brain.head.profile", color: .pink)
+        ].filter { $0.value != "0" && $0.value != "0.0" } // Only show metrics with data
+    }
+    
+    private func formatHealthDataPoint(_ data: HealthDataPoint, days: Int) -> [CardioMetric] {
+        return [
+            CardioMetric(title: "Steps", value: formatValue(Double(data.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: .blue),
+            CardioMetric(title: "Walking Distance", value: formatDistance(data.walkingDistance), unit: "km", icon: "figure.walk", color: .green),
+            CardioMetric(title: "Running Distance", value: formatDistance(data.runningDistance), unit: "km", icon: "figure.run", color: .red),
+            CardioMetric(title: "Cycling Distance", value: formatDistance(data.cyclingDistance), unit: "km", icon: "bicycle", color: .blue),
+            CardioMetric(title: "Active Energy", value: formatValue(data.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: .orange),
+            CardioMetric(title: "Resting Energy", value: formatValue(data.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: .gray),
+            CardioMetric(title: "Exercise Time", value: formatTime(data.exerciseMinutes), unit: "min", icon: "figure.run", color: .green),
+            CardioMetric(title: "Stand Time", value: formatTime(data.standMinutes), unit: "min", icon: "figure.stand", color: .purple),
+            CardioMetric(title: "Sleep Total", value: formatTime(data.sleepTotal), unit: "min", icon: "bed.double.fill", color: .indigo)
+        ].filter { $0.value != "0" && $0.value != "0.0" }
+    }
+    
+    private func extractMetricValue(from daily: DailyAnalytics, type: String) -> (value: Double, unit: String, color: Color) {
+        switch type.lowercased() {
+        case "steps": return (Double(daily.steps), "steps", .blue)
+        case "walkingdistance": return (daily.walkingDistance / 1000, "km", .green)
+        case "runningdistance": return (daily.runningDistance / 1000, "km", .red)
+        case "cyclingdistance": return (daily.cyclingDistance / 1000, "km", .blue)
+        case "activeenergy": return (daily.energyActive, "cal", .orange)
+        case "restingenergy": return (daily.energyResting, "cal", .gray)
+        case "exercisetime": return (Double(daily.exerciseMinutes), "min", .green)
+        case "standtime": return (Double(daily.standMinutes), "min", .purple)
+        case "sleep": return (Double(daily.sleepTotal), "min", .indigo)
+        default: return (0, "", .gray)
+        }
+    }
+    
+    private func getMetricDisplayInfo(for type: String) -> (title: String, icon: String, color: Color) {
+        switch type.lowercased() {
+        case "steps": return ("Steps", "figure.walk", .blue)
+        case "walkingdistance": return ("Walking Distance", "figure.walk", .green)
+        case "runningdistance": return ("Running Distance", "figure.run", .red)
+        case "cyclingdistance": return ("Cycling Distance", "bicycle", .blue)
+        case "activeenergy": return ("Active Energy", "flame.fill", .orange)
+        case "restingenergy": return ("Resting Energy", "bed.double.fill", .gray)
+        case "exercisetime": return ("Exercise Time", "figure.run", .green)
+        case "standtime": return ("Stand Time", "figure.stand", .purple)
+        case "sleep": return ("Sleep", "bed.double.fill", .indigo)
+        default: return ("Unknown", "questionmark", .gray)
+        }
+    }
+    
+    private func formatValue(_ value: Double, decimals: Int) -> String {
+        if decimals == 0 {
+            return String(format: "%.0f", value)
+        } else {
+            return String(format: "%.\(decimals)f", value)
+        }
+    }
+    
+    private func formatDistance(_ meters: Double) -> String {
+        let km = meters / 1000
+        if km < 0.1 {
+            return String(format: "%.0f", meters) // Show meters if less than 100m
+        } else {
+            return String(format: "%.2f", km)
+        }
+    }
+    
+    private func formatTime(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)"
+        } else {
+            let hours = minutes / 60
+            let mins = minutes % 60
+            return "\(hours)h \(mins)m"
+        }
     }
 }
