@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import HealthKit
 import SwiftUI
+import Combine
 
 /// UI-ready health metric for display in the app
 public struct CardioMetric: Identifiable {
@@ -62,30 +63,10 @@ public struct TimeSeriesData {
     }
 }
 
-/// Internal helper for aggregating health data
-struct HealthDataPoint {
-    var steps: Int = 0
-    var cyclingDistance: Double = 0.0
-    var walkingDistance: Double = 0.0
-    var runningDistance: Double = 0.0
-    var swimmingDistance: Double = 0.0
-    var swimmingStrokes: Int = 0
-    var crossCountrySkiingDistance: Double = 0.0
-    var downhillSnowSportsDistance: Double = 0.0
-    var energyActive: Double = 0.0
-    var energyResting: Double = 0.0
-    var heartbeats: Int = 0
-    var stairsClimbed: Int = 0
-    var exerciseMinutes: Int = 0
-    var standMinutes: Int = 0
-    var sleepTotal: Int = 0
-    var sleepDeep: Int = 0
-    var sleepREM: Int = 0
-}
 
 /// Main interface for health statistics tracking and analytics
 /// Combines HealthKit data fetching with SwiftData persistence
-public final class HealthStatsLibrary {
+public final class HealthStatsLibrary: ObservableObject {
     // Core managers for different aspects of health data handling
     private let healthKitManager = HealthKitManager()
     private let healthDataAggregator = HealthDataAggregator()
@@ -1082,7 +1063,7 @@ public final class HealthStatsLibrary {
                 value: formatValue(Double(highscoreRecord.mostStepsInADay), decimals: 0),
                 unit: "steps",
                 icon: "figure.walk",
-                color: .blue
+                color: Color.blue
             ))
         }
         
@@ -1093,7 +1074,7 @@ public final class HealthStatsLibrary {
                 value: formatValue(highscoreRecord.mostCaloriesInADay, decimals: 0),
                 unit: "cal",
                 icon: "flame.fill",
-                color: .orange
+                color: Color.orange
             ))
         }
         
@@ -1104,7 +1085,7 @@ public final class HealthStatsLibrary {
                 value: formatTime(highscoreRecord.mostExerciseMinutesInADay),
                 unit: "min",
                 icon: "figure.run",
-                color: .green
+                color: Color.green
             ))
         }
         
@@ -1115,7 +1096,7 @@ public final class HealthStatsLibrary {
                 value: formatDistance(highscoreRecord.longestWalk),
                 unit: "km",
                 icon: "figure.walk",
-                color: .green
+                color: Color.green
             ))
         }
         
@@ -1125,7 +1106,7 @@ public final class HealthStatsLibrary {
                 value: formatDistance(highscoreRecord.longestBikeRide),
                 unit: "km",
                 icon: "bicycle",
-                color: .blue
+                color: Color.blue
             ))
         }
         
@@ -1135,7 +1116,7 @@ public final class HealthStatsLibrary {
                 value: formatDistance(highscoreRecord.longestSwim),
                 unit: "km",
                 icon: "figure.pool.swim",
-                color: .cyan
+                color: Color.blue
             ))
         }
         
@@ -1146,7 +1127,7 @@ public final class HealthStatsLibrary {
                 value: formatTime(highscoreRecord.longestSleep),
                 unit: "min",
                 icon: "bed.double.fill",
-                color: .indigo
+                color: Color.blue
             ))
         }
         
@@ -1156,7 +1137,7 @@ public final class HealthStatsLibrary {
                 value: formatTime(highscoreRecord.mostDeepSleep),
                 unit: "min",
                 icon: "moon.zzz.fill",
-                color: .blue
+                color: Color.blue
             ))
         }
         
@@ -1166,7 +1147,7 @@ public final class HealthStatsLibrary {
                 value: formatTime(highscoreRecord.mostREMSleep),
                 unit: "min",
                 icon: "brain.head.profile",
-                color: .pink
+                color: Color.red
             ))
         }
         
@@ -1177,7 +1158,7 @@ public final class HealthStatsLibrary {
                 value: "\(highscoreRecord.sleepStreakRecord)",
                 unit: "days",
                 icon: "calendar",
-                color: .indigo
+                color: Color.blue
             ))
         }
         
@@ -1187,7 +1168,7 @@ public final class HealthStatsLibrary {
                 value: "\(highscoreRecord.workoutStreakRecord)",
                 unit: "days",
                 icon: "calendar",
-                color: .green
+                color: Color.green
             ))
         }
         
@@ -1209,21 +1190,21 @@ public final class HealthStatsLibrary {
                 value: formatValue(Double(today.steps), decimals: 0),
                 unit: "steps",
                 icon: "figure.walk",
-                color: .blue
+                color: Color.blue
             ),
             CardioMetric(
                 title: "Active Energy",
                 value: formatValue(today.energyActive, decimals: 0),
                 unit: "cal",
                 icon: "flame.fill",
-                color: .orange
+                color: Color.orange
             ),
             CardioMetric(
                 title: "Exercise Time",
                 value: formatTime(today.exerciseMinutes),
                 unit: "min",
                 icon: "figure.run",
-                color: .green
+                color: Color.green
             )
         ]
     }
@@ -1292,7 +1273,7 @@ public final class HealthStatsLibrary {
     public func getTimeSeriesData(metricType: String, from startDate: Date, to endDate: Date) throws -> TimeSeriesData {
         let dailyRecords = try getDailyAnalytics(from: startDate, to: endDate)
         let dataPoints: [TimeSeriesDataPoint] = dailyRecords.compactMap { daily in
-            let (value, unit, color) = extractMetricValue(from: daily, type: metricType)
+            let (value, unit, _) = extractMetricValue(from: daily, type: metricType)
             guard value > 0 else { return nil }
             
             return TimeSeriesDataPoint(
@@ -1318,61 +1299,61 @@ public final class HealthStatsLibrary {
     
     private func formatDailyAnalytics(_ daily: DailyAnalytics) -> [CardioMetric] {
         return [
-            CardioMetric(title: "Steps", value: formatValue(Double(daily.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: .blue),
-            CardioMetric(title: "Walking Distance", value: formatDistance(daily.walkingDistance), unit: "km", icon: "figure.walk", color: .green),
-            CardioMetric(title: "Running Distance", value: formatDistance(daily.runningDistance), unit: "km", icon: "figure.run", color: .red),
-            CardioMetric(title: "Cycling Distance", value: formatDistance(daily.cyclingDistance), unit: "km", icon: "bicycle", color: .blue),
-            CardioMetric(title: "Active Energy", value: formatValue(daily.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: .orange),
-            CardioMetric(title: "Resting Energy", value: formatValue(daily.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: .gray),
-            CardioMetric(title: "Exercise Time", value: formatTime(daily.exerciseMinutes), unit: "min", icon: "figure.run", color: .green),
-            CardioMetric(title: "Stand Time", value: formatTime(daily.standMinutes), unit: "min", icon: "figure.stand", color: .purple),
+            CardioMetric(title: "Steps", value: formatValue(Double(daily.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: Color.blue),
+            CardioMetric(title: "Walking Distance", value: formatDistance(daily.walkingDistance), unit: "km", icon: "figure.walk", color: Color.green),
+            CardioMetric(title: "Running Distance", value: formatDistance(daily.runningDistance), unit: "km", icon: "figure.run", color: Color.red),
+            CardioMetric(title: "Cycling Distance", value: formatDistance(daily.cyclingDistance), unit: "km", icon: "bicycle", color: Color.blue),
+            CardioMetric(title: "Active Energy", value: formatValue(daily.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: Color.orange),
+            CardioMetric(title: "Resting Energy", value: formatValue(daily.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: Color.gray),
+            CardioMetric(title: "Exercise Time", value: formatTime(daily.exerciseMinutes), unit: "min", icon: "figure.run", color: Color.green),
+            CardioMetric(title: "Stand Time", value: formatTime(daily.standMinutes), unit: "min", icon: "figure.stand", color: Color.blue),
             CardioMetric(title: "Sleep Total", value: formatTime(daily.sleepTotal), unit: "min", icon: "bed.double.fill", color: .indigo),
-            CardioMetric(title: "Deep Sleep", value: formatTime(daily.sleepDeep), unit: "min", icon: "moon.zzz.fill", color: .blue),
+            CardioMetric(title: "Deep Sleep", value: formatTime(daily.sleepDeep), unit: "min", icon: "moon.zzz.fill", color: Color.blue),
             CardioMetric(title: "REM Sleep", value: formatTime(daily.sleepREM), unit: "min", icon: "brain.head.profile", color: .pink)
         ].filter { $0.value != "0" && $0.value != "0.0" } // Only show metrics with data
     }
     
     private func formatHealthDataPoint(_ data: HealthDataPoint, days: Int) -> [CardioMetric] {
         return [
-            CardioMetric(title: "Steps", value: formatValue(Double(data.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: .blue),
-            CardioMetric(title: "Walking Distance", value: formatDistance(data.walkingDistance), unit: "km", icon: "figure.walk", color: .green),
-            CardioMetric(title: "Running Distance", value: formatDistance(data.runningDistance), unit: "km", icon: "figure.run", color: .red),
-            CardioMetric(title: "Cycling Distance", value: formatDistance(data.cyclingDistance), unit: "km", icon: "bicycle", color: .blue),
-            CardioMetric(title: "Active Energy", value: formatValue(data.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: .orange),
-            CardioMetric(title: "Resting Energy", value: formatValue(data.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: .gray),
-            CardioMetric(title: "Exercise Time", value: formatTime(data.exerciseMinutes), unit: "min", icon: "figure.run", color: .green),
-            CardioMetric(title: "Stand Time", value: formatTime(data.standMinutes), unit: "min", icon: "figure.stand", color: .purple),
+            CardioMetric(title: "Steps", value: formatValue(Double(data.steps), decimals: 0), unit: "steps", icon: "figure.walk", color: Color.blue),
+            CardioMetric(title: "Walking Distance", value: formatDistance(data.walkingDistance), unit: "km", icon: "figure.walk", color: Color.green),
+            CardioMetric(title: "Running Distance", value: formatDistance(data.runningDistance), unit: "km", icon: "figure.run", color: Color.red),
+            CardioMetric(title: "Cycling Distance", value: formatDistance(data.cyclingDistance), unit: "km", icon: "bicycle", color: Color.blue),
+            CardioMetric(title: "Active Energy", value: formatValue(data.energyActive, decimals: 0), unit: "cal", icon: "flame.fill", color: Color.orange),
+            CardioMetric(title: "Resting Energy", value: formatValue(data.energyResting, decimals: 0), unit: "cal", icon: "bed.double.fill", color: Color.gray),
+            CardioMetric(title: "Exercise Time", value: formatTime(data.exerciseMinutes), unit: "min", icon: "figure.run", color: Color.green),
+            CardioMetric(title: "Stand Time", value: formatTime(data.standMinutes), unit: "min", icon: "figure.stand", color: Color.blue),
             CardioMetric(title: "Sleep Total", value: formatTime(data.sleepTotal), unit: "min", icon: "bed.double.fill", color: .indigo)
         ].filter { $0.value != "0" && $0.value != "0.0" }
     }
     
     private func extractMetricValue(from daily: DailyAnalytics, type: String) -> (value: Double, unit: String, color: Color) {
         switch type.lowercased() {
-        case "steps": return (Double(daily.steps), "steps", .blue)
-        case "walkingdistance": return (daily.walkingDistance / 1000, "km", .green)
-        case "runningdistance": return (daily.runningDistance / 1000, "km", .red)
-        case "cyclingdistance": return (daily.cyclingDistance / 1000, "km", .blue)
-        case "activeenergy": return (daily.energyActive, "cal", .orange)
-        case "restingenergy": return (daily.energyResting, "cal", .gray)
-        case "exercisetime": return (Double(daily.exerciseMinutes), "min", .green)
-        case "standtime": return (Double(daily.standMinutes), "min", .purple)
-        case "sleep": return (Double(daily.sleepTotal), "min", .indigo)
-        default: return (0, "", .gray)
+        case "steps": return (Double(daily.steps), "steps", Color.blue)
+        case "walkingdistance": return (daily.walkingDistance / 1000, "km", Color.green)
+        case "runningdistance": return (daily.runningDistance / 1000, "km", Color.red)
+        case "cyclingdistance": return (daily.cyclingDistance / 1000, "km", Color.blue)
+        case "activeenergy": return (daily.energyActive, "cal", Color.orange)
+        case "restingenergy": return (daily.energyResting, "cal", Color.gray)
+        case "exercisetime": return (Double(daily.exerciseMinutes), "min", Color.green)
+        case "standtime": return (Double(daily.standMinutes), "min", Color.blue)
+        case "sleep": return (Double(daily.sleepTotal), "min", Color.blue)
+        default: return (0, "", Color.gray)
         }
     }
     
     private func getMetricDisplayInfo(for type: String) -> (title: String, icon: String, color: Color) {
         switch type.lowercased() {
-        case "steps": return ("Steps", "figure.walk", .blue)
-        case "walkingdistance": return ("Walking Distance", "figure.walk", .green)
-        case "runningdistance": return ("Running Distance", "figure.run", .red)
-        case "cyclingdistance": return ("Cycling Distance", "bicycle", .blue)
-        case "activeenergy": return ("Active Energy", "flame.fill", .orange)
-        case "restingenergy": return ("Resting Energy", "bed.double.fill", .gray)
-        case "exercisetime": return ("Exercise Time", "figure.run", .green)
-        case "standtime": return ("Stand Time", "figure.stand", .purple)
-        case "sleep": return ("Sleep", "bed.double.fill", .indigo)
-        default: return ("Unknown", "questionmark", .gray)
+        case "steps": return ("Steps", "figure.walk", Color.blue)
+        case "walkingdistance": return ("Walking Distance", "figure.walk", Color.green)
+        case "runningdistance": return ("Running Distance", "figure.run", Color.red)
+        case "cyclingdistance": return ("Cycling Distance", "bicycle", Color.blue)
+        case "activeenergy": return ("Active Energy", "flame.fill", Color.orange)
+        case "restingenergy": return ("Resting Energy", "bed.double.fill", Color.gray)
+        case "exercisetime": return ("Exercise Time", "figure.run", Color.green)
+        case "standtime": return ("Stand Time", "figure.stand", Color.blue)
+        case "sleep": return ("Sleep", "bed.double.fill", Color.blue)
+        default: return ("Unknown", "questionmark", Color.gray)
         }
     }
     
